@@ -1,0 +1,27 @@
+﻿{
+  "FileVersion": 1,
+  "Version": 1,
+  "VersionName": "1.0",
+  "FriendlyName": "Nacho Hierarchical Task Networks Planner",
+  "Description": "Custom implementation of a HTN",
+  "Category": "Other",
+  "CreatedBy": "Ignacio de la Vega",
+  "CreatedByURL": "",
+  "DocsURL": "",
+  "MarketplaceURL": "",
+  "SupportURL": "",
+  "CanContainContent": true,
+  "IsBetaVersion": false,
+  "IsExperimentalVersion": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "NHTN",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+
+  ]
+}
