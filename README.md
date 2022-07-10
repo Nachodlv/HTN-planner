@@ -19,3 +19,4 @@
 - [ ] Slots -> insert domains dynamically
 - [ ] Give blueprint support for domain construction
 - [ ] Custom editor for domain construction
+- [ ] GOAP planning support
