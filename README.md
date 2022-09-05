@@ -1,8 +1,8 @@
 # Hierarchical task network planner
 ## TO-DO
-- [ ] Basic building blocks
-  - [ ] Primitive Tasks
-  - [ ] Compound Tasks
+- [X] Basic building blocks
+  - [X] Primitive Tasks
+  - [X] Compound Tasks
 - [ ] Override Brain Component
   - [ ] Handle world state
   - [ ] Handle tasks
