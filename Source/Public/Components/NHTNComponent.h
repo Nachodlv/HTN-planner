@@ -44,14 +44,18 @@ protected:
 	/** Runs the corresponding task */
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	// TODO (Ignacio) move to a manager or something
+	/** Creates a new plan based on the Domain assigned */
+	void StartPlanning();
+
 private:
 	/** Contains the tasks used to run the HTN */
 	UPROPERTY(EditAnywhere, Category = "NHTN")
 	TSoftObjectPtr<UNHTNDomain> Domain;
 
-	/** The tasks instanced that were contained in the domain */
+	/** The current plan that is being executed */
 	UPROPERTY(Transient)
-	TArray<UNHTNPrimitiveTask*> InitializedTasks;
+	TArray<TObjectPtr<UNHTNBaseTask>> Plan;
 
 	/** Whether the tasks from the domain where initialized */
 	bool bInitialized = false;

@@ -5,7 +5,7 @@
 
 #include "NHTNDomain.generated.h"
 
-class UNHTNPrimitiveTask;
+class UNHTNBaseTask;
 
 UCLASS()
 class NHTN_API UNHTNDomain : public UDataAsset
@@ -14,9 +14,9 @@ class NHTN_API UNHTNDomain : public UDataAsset
 
 public:
 	UFUNCTION(BlueprintPure)
-	const TArray<TSoftClassPtr<UNHTNPrimitiveTask>>& GetTasks() const { return Tasks; }
+	const TArray<UNHTNBaseTask*>& GetTasks() const { return Tasks; }
 
 private:
-	UPROPERTY(EditAnywhere, Category = "NHTN")
-	TArray<TSoftClassPtr<UNHTNPrimitiveTask>> Tasks;
+	UPROPERTY(EditAnywhere, Instanced, Category = "NHTN")
+	TArray<TObjectPtr<UNHTNBaseTask>> Tasks;
 };

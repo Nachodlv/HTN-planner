@@ -1,7 +1,33 @@
 ﻿#include "Components/NHTNComponent.h"
 
+// UE Includes
+#include "Algo/AllOf.h"
+
 // NHTN Includes
+#include "Tasks/NHTNCompoundTask.h"
 #include "Tasks/NHTNDomain.h"
+
+namespace NHTNComponentHelper
+{
+	template<typename T>
+	bool CanAllBeExecuted(const TArray<T>& Nodes, const UBlackboardComponent& WorldState)
+	{
+		return Algo::AllOf(Nodes, [&WorldState](const T Node)
+		{
+			return Node->CanBeExecuted(WorldState);
+		});
+	}
+
+	template<typename T, typename O>
+	void PushAllReversed(TArray<T>& Stack, const TArray<O>& Nodes)
+	{
+		Stack.Reserve(Stack.Num() + Nodes.Num());
+		for (int32 i = Nodes.Num() - 1; i >= 0; --i)
+		{
+			Stack.Push(Nodes[i]);
+		}
+	}
+}
 
 UNHTNComponent::UNHTNComponent()
 {
@@ -17,17 +43,15 @@ void UNHTNComponent::StartLogic()
 			return;
 		}
 		const UNHTNDomain* DomainPtr = Domain.LoadSynchronous();
-		const TArray<TSoftClassPtr<UNHTNPrimitiveTask>>& Tasks = DomainPtr->GetTasks();
-
-		for (const TSoftClassPtr<UNHTNPrimitiveTask>& TaskClass : Tasks)
+		const TArray<UNHTNBaseTask*>& Tasks = DomainPtr->GetTasks();
+		
+		ensureMsgf(Tasks.Num() != 0, TEXT("No tasks to run"));
+		
+		for (UNHTNBaseTask* Task : Tasks)
 		{
-			InitializedTasks.Add(NewObject<UNHTNPrimitiveTask>(this, TaskClass.LoadSynchronous()));
+			Task->InitializeTask(*this);
 		}
 		bInitialized = true;
-	}
-	if (!ensureMsgf(InitializedTasks.Num() != 0, TEXT("No tasks to run")))
-	{
-		return;
 	}
 	bRunning = true;
 	CurrentTask = INDEX_NONE;
@@ -71,7 +95,7 @@ void UNHTNComponent::Cleanup()
 {
 	StopLogic(FString(TEXT("Cleanup")));
 
-	InitializedTasks.Reset();
+	Plan.Reset();
 	bInitialized = false;
 }
 
@@ -86,10 +110,57 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 {
 	if (bRunning && !bPaused)
 	{
-		if (CurrentTask == INDEX_NONE || CurrentTaskStatus != ENHTNTaskStatus::InProgress)
+		bool bNeedsPlanning = Plan.Num() == 0;
+		
+		if (!bNeedsPlanning && (CurrentTask == INDEX_NONE || CurrentTaskStatus != ENHTNTaskStatus::InProgress))
 		{
-			CurrentTask = (CurrentTask + 1) % InitializedTasks.Num();
-			CurrentTaskStatus = InitializedTasks[CurrentTask]->ExecuteTask(*this);
+			++CurrentTask;
+			if (Plan.IsValidIndex(CurrentTask))
+			{
+				CurrentTaskStatus = Plan[CurrentTask]->ExecuteTask(*this);
+			}
+			else
+			{
+				bNeedsPlanning = true;
+			}
+		}
+
+		if (bNeedsPlanning)
+		{
+			StartPlanning();
+			CurrentTask = INDEX_NONE;
+		}
+	}
+}
+
+void UNHTNComponent::StartPlanning()
+{
+	// TODO (Ignacio) make a copy of the blackboard
+	const UBlackboardComponent& BBComp = *GetBlackboardComponent();
+	Plan.Reset();
+	TArray<UNHTNBaseTask*> StackPlan;
+	NHTNComponentHelper::PushAllReversed(StackPlan, Domain->GetTasks());
+	while (!StackPlan.IsEmpty())
+	{
+		UNHTNBaseTask* Task = StackPlan.Pop();
+		if (const UNHTNCompoundTask* CompoundTask = Cast<UNHTNCompoundTask>(Task))
+		{
+			const TArray<FNHTNMethod>& Methods = CompoundTask->GetMethods();
+			for (const FNHTNMethod& Method : Methods)
+			{
+				if (NHTNComponentHelper::CanAllBeExecuted(Method.Decorators, BBComp))
+				{
+					NHTNComponentHelper::PushAllReversed(StackPlan, Method.Tasks);
+				}
+			}
+		}
+		else
+		{
+			UNHTNPrimitiveTask* PrimitiveTask = CastChecked<UNHTNPrimitiveTask>(Task);
+			if (PrimitiveTask->CanBeExecuted(BBComp))
+			{
+				Plan.Add(PrimitiveTask);
+			}
 		}
 	}
 }
