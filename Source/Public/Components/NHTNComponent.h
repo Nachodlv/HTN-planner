@@ -31,7 +31,6 @@ public:
 
 	/** Sets the domain that will be run when the HTN is executed */
 	void SetDomain(const TSoftObjectPtr<UNHTNDomain>& HTNDomain) { Domain = HTNDomain; }
-	void SetDomain(const UNHTNDomain* HTNDomain) { Domain = HTNDomain; }
 
 protected:
 	// ~ Begin UBrainComponent

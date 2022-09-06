@@ -2,6 +2,7 @@
 
 // NHTN Includes
 #include "Components/NHTNComponent.h"
+#include "Domain/NHTNDomain.h"
 
 
 void ANHTNAIController::RunHTN()
@@ -12,6 +13,11 @@ void ANHTNAIController::RunHTN()
 		HTNComponent->RegisterComponent();
 	}
 	BrainComponent = HTNComponent;
+	if (const UNHTNDomain* DomainLoaded = Domain.LoadSynchronous())
+	{
+		UBlackboardComponent* BBComp;
+		UseBlackboard(DomainLoaded->GetBlackboardAsset(), BBComp);
+	}
 	HTNComponent->SetDomain(Domain);
 	HTNComponent->StartLogic();
 }

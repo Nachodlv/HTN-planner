@@ -5,7 +5,7 @@
 
 // NHTN Includes
 #include "Tasks/NHTNCompoundTask.h"
-#include "Tasks/NHTNDomain.h"
+#include "Domain/NHTNDomain.h"
 
 namespace NHTNComponentHelper
 {
@@ -38,11 +38,11 @@ void UNHTNComponent::StartLogic()
 {
 	if (!bInitialized)
 	{
-		if (!ensureMsgf(Domain, TEXT("No HTN domain provided")))
+		const UNHTNDomain* DomainPtr = Domain.LoadSynchronous();
+		if (!ensureMsgf(DomainPtr, TEXT("No HTN domain provided")))
 		{
 			return;
 		}
-		const UNHTNDomain* DomainPtr = Domain.LoadSynchronous();
 		const TArray<UNHTNBaseTask*>& Tasks = DomainPtr->GetTasks();
 		
 		ensureMsgf(Tasks.Num() != 0, TEXT("No tasks to run"));
