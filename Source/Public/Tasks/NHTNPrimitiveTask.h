@@ -21,4 +21,8 @@ public:
 
 	/** Applies the corresponding effects to the world state as if the task was executed. Only used on planning. */
 	virtual void ApplyExpectedEffects(UBlackboardComponent& WorldState) const {}
+
+protected:
+	/** Changes the state of the current task */
+	static void FinishLatentTask(UNHTNComponent& HTNComp, ENHTNTaskStatus Status);
 };

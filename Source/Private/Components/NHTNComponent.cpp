@@ -4,8 +4,9 @@
 #include "Algo/AllOf.h"
 
 // NHTN Includes
-#include "Tasks/NHTNCompoundTask.h"
+#include "Components/NHTNBlackboardComponent.h"
 #include "Domain/NHTNDomain.h"
+#include "Tasks/NHTNCompoundTask.h"
 
 namespace NHTNComponentHelper
 {
@@ -62,6 +63,10 @@ void UNHTNComponent::RestartLogic()
 	Super::RestartLogic();
 	if (IsRunning())
 	{
+		if (Plan.Num() > 0)
+		{
+			Plan[CurrentTask]->AbortTask(*this);
+		}
 		CurrentTask = INDEX_NONE;
 	}
 }
@@ -91,6 +96,15 @@ EAILogicResuming::Type UNHTNComponent::ResumeLogic(const FString& Reason)
 	return EAILogicResuming::Continue;
 }
 
+void UNHTNComponent::FinishLatentTask(ENHTNTaskStatus Status)
+{
+	if (IsRunning())
+	{
+		Plan[CurrentTask]->AbortTask(*this);
+	}
+	SetCurrentTaskStatus(Status);
+}
+
 void UNHTNComponent::Cleanup()
 {
 	StopLogic(FString(TEXT("Cleanup")));
@@ -117,7 +131,7 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 			++CurrentTask;
 			if (Plan.IsValidIndex(CurrentTask))
 			{
-				CurrentTaskStatus = Plan[CurrentTask]->ExecuteTask(*this);
+				SetCurrentTaskStatus(Plan[CurrentTask]->ExecuteTask(*this));
 			}
 			else
 			{
@@ -135,9 +149,12 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 void UNHTNComponent::StartPlanning()
 {
-	// TODO (Ignacio) make a copy of the blackboard
-	const UBlackboardComponent& BBComp = *GetBlackboardComponent();
+	UNHTNBlackboardComponent& BBComp = *GetHTNBBComp();
+	// Save the current memory from the blackboard to restore after the planning has finished
+	FNHTNBlackboardMemory BBMemory = BBComp.RetrieveBBMemory();
+	
 	Plan.Reset();
+	
 	TArray<UNHTNBaseTask*> StackPlan;
 	NHTNComponentHelper::PushAllReversed(StackPlan, Domain->GetTasks());
 	while (!StackPlan.IsEmpty())
@@ -159,10 +176,28 @@ void UNHTNComponent::StartPlanning()
 			UNHTNPrimitiveTask* PrimitiveTask = CastChecked<UNHTNPrimitiveTask>(Task);
 			if (PrimitiveTask->CanBeExecuted(BBComp))
 			{
+				PrimitiveTask->ApplyExpectedEffects(BBComp);
 				Plan.Add(PrimitiveTask);
 			}
 		}
 	}
+
+	// Restore memory from blackboard
+	BBComp.SetBBMemory(BBMemory);
+}
+
+UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp()
+{
+	return Cast<UNHTNBlackboardComponent>(GetBlackboardComponent());
+}
+
+void UNHTNComponent::SetCurrentTaskStatus(ENHTNTaskStatus NewStatus)
+{
+	if (NewStatus == ENHTNTaskStatus::Success && IsRunning())
+	{
+		Plan[CurrentTask]->ApplyEffects(*GetBlackboardComponent());
+	}
+	CurrentTaskStatus = NewStatus;
 }
 
 

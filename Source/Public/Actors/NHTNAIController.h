@@ -8,6 +8,7 @@
 
 class UNHTNComponent;
 class UNHTNDomain;
+class UNHTNBlackboardComponent;
 
 /** Basic AIController that provides the functionality to run a HTN */
 UCLASS()
@@ -27,4 +28,8 @@ private:
 	/** Component currently being used to run the Domain */
 	UPROPERTY(Transient)
 	TObjectPtr<UNHTNComponent> HTNComponent = nullptr;
+
+	/** Cached blackboard that wil be created when the HTN starts running */
+	UPROPERTY(Transient)
+	TObjectPtr<UNHTNBlackboardComponent> HTNBBComp = nullptr;
 };

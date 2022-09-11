@@ -25,9 +25,9 @@ class NHTN_API UNHTNBaseTask : public UNHTNBaseNode
 
 public:
 	/** Runs the operator AI task */
-	virtual ENHTNTaskStatus ExecuteTask(const UNHTNComponent& HTNComp) const { return ENHTNTaskStatus::Success; }
+	virtual ENHTNTaskStatus ExecuteTask(UNHTNComponent& HTNComp) { return ENHTNTaskStatus::Success; }
 
-	virtual void AbortTask(const UNHTNComponent& HTNComp) const {}
+	virtual void AbortTask(UNHTNComponent& HTNComp) {}
 
 	virtual void InitializeTask(UNHTNComponent& HTNComp) {}
 };

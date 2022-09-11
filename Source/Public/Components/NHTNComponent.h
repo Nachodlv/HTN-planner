@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 // NHTN Includes
+#include "NHTNBlackboardComponent.h"
 #include "Tasks/NHTNPrimitiveTask.h"
 
 #include "NHTNComponent.generated.h"
@@ -32,6 +33,9 @@ public:
 	/** Sets the domain that will be run when the HTN is executed */
 	void SetDomain(const TSoftObjectPtr<UNHTNDomain>& HTNDomain) { Domain = HTNDomain; }
 
+	/** Changes the status of the current running task */
+	void FinishLatentTask(ENHTNTaskStatus Status);
+
 protected:
 	// ~ Begin UBrainComponent
 	virtual bool IsRunning() const override { return bRunning; }
@@ -47,6 +51,12 @@ protected:
 	/** Creates a new plan based on the Domain assigned */
 	void StartPlanning();
 
+	UFUNCTION(BlueprintPure)
+	UNHTNBlackboardComponent* GetHTNBBComp();
+
+	/** Sets the status of the current running tasks. Executes its effects if necessary */
+	void SetCurrentTaskStatus(ENHTNTaskStatus NewStatus);
+
 private:
 	/** Contains the tasks used to run the HTN */
 	UPROPERTY(EditAnywhere, Category = "NHTN")
@@ -54,7 +64,7 @@ private:
 
 	/** The current plan that is being executed */
 	UPROPERTY(Transient)
-	TArray<TObjectPtr<UNHTNBaseTask>> Plan;
+	TArray<TObjectPtr<UNHTNPrimitiveTask>> Plan;
 
 	/** Whether the tasks from the domain where initialized */
 	bool bInitialized = false;
