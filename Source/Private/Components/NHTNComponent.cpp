@@ -61,12 +61,13 @@ void UNHTNComponent::StartLogic()
 void UNHTNComponent::RestartLogic()
 {
 	Super::RestartLogic();
-	if (IsRunning())
+	if (IsRunning() && Plan.Num() > 0)
 	{
-		if (Plan.Num() > 0)
+		if (!bPlanning)
 		{
-			Plan[CurrentTask]->AbortTask(*this);
+			GetCurrentTask()->AbortTask(*this);
 		}
+		// TODO (Ignacio) we should stop planning if it was async
 		CurrentTask = INDEX_NONE;
 	}
 }
@@ -100,7 +101,7 @@ void UNHTNComponent::FinishLatentTask(ENHTNTaskStatus Status)
 {
 	if (IsRunning())
 	{
-		Plan[CurrentTask]->AbortTask(*this);
+		GetCurrentTask()->AbortTask(*this);
 	}
 	SetCurrentTaskStatus(Status);
 }
@@ -117,7 +118,7 @@ void UNHTNComponent::HandleMessage(const FAIMessage& Message)
 {
 	Super::HandleMessage(Message);
 	// TODO (Ignacio) handle messages
-	ensureMsgf(false, TEXT("Not handling messages yet"));
+	// ensureMsgf(false, TEXT("Not handling messages yet"));
 }
 
 void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -129,7 +130,7 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		if (!bNeedsPlanning && (CurrentTask == INDEX_NONE || CurrentTaskStatus != ENHTNTaskStatus::InProgress))
 		{
 			++CurrentTask;
-			if (Plan.IsValidIndex(CurrentTask))
+			if (Plan.IsValidIndex(CurrentTask) && Plan[CurrentTask]->CanBeExecuted(*GetBlackboardComponent()))
 			{
 				SetCurrentTaskStatus(Plan[CurrentTask]->ExecuteTask(*this));
 			}
@@ -141,6 +142,7 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 		if (bNeedsPlanning)
 		{
+			bPlanning = true;
 			StartPlanning();
 			CurrentTask = INDEX_NONE;
 		}
@@ -195,9 +197,14 @@ void UNHTNComponent::SetCurrentTaskStatus(ENHTNTaskStatus NewStatus)
 {
 	if (NewStatus == ENHTNTaskStatus::Success && IsRunning())
 	{
-		Plan[CurrentTask]->ApplyEffects(*GetBlackboardComponent());
+		GetCurrentTask()->ApplyEffects(*GetBlackboardComponent());
 	}
 	CurrentTaskStatus = NewStatus;
+}
+
+UNHTNPrimitiveTask* UNHTNComponent::GetCurrentTask() const
+{
+	return Plan[CurrentTask];
 }
 
 

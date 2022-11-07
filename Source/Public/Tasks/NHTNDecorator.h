@@ -23,8 +23,12 @@ public:
 protected:
 	/** The condition that will be check without any modifier from the decorator itself as bInverse */
 	virtual bool CalculateRawCondition(const UBlackboardComponent& WorldState) const { return true; }
+
+	/** Returns whether the result of UNHTNDecorator::CalculateRawCondition will be inversed */
+	bool IsConditionInversed() const { return bInverse; }
 	
 private:
+	/** Whether the result of UNHTNDecorator::CalculateRawCondition will be inversed */
 	UPROPERTY(EditAnywhere, Category = "NHTN")
 	bool bInverse = false;
 };

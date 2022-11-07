@@ -8,6 +8,7 @@ void UNHTNCompoundTask::InitializeTask(UNHTNComponent& HTNComp)
 		for (UNHTNBaseTask* Task : Method.Tasks)
 		{
 			Task->InitializeTask(HTNComp);
+			Task->SetParentTask(this);
 		}
 	}
 }

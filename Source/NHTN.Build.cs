@@ -28,6 +28,7 @@ public class NHTN : ModuleRules
 			"InputCore",
 			"Slate",
 			"SlateCore",
+			"GameplayDebugger"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]

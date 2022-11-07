@@ -30,4 +30,15 @@ public:
 	virtual void AbortTask(UNHTNComponent& HTNComp) {}
 
 	virtual void InitializeTask(UNHTNComponent& HTNComp) {}
+
+	UFUNCTION(BlueprintPure)
+	UNHTNBaseTask* GetParentTask() const { return ParentTask; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetParentTask(UNHTNBaseTask* InParentTask) { ParentTask = InParentTask; }
+
+protected:
+	/** The task containing this one. Usually a compound task */
+	UPROPERTY(Transient)
+	TObjectPtr<UNHTNBaseTask> ParentTask = nullptr;
 };

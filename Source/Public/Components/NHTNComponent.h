@@ -19,6 +19,10 @@ class NHTN_API UNHTNComponent : public UBrainComponent
 {
 	GENERATED_BODY()
 
+#if WITH_GAMEPLAY_DEBUGGER
+	friend class FNHTNGameplayDebugger_HTN;
+#endif // WITH_GAMEPLAY_DEBUGGER
+	
 public:
 	UNHTNComponent();
 
@@ -57,6 +61,9 @@ protected:
 	/** Sets the status of the current running tasks. Executes its effects if necessary */
 	void SetCurrentTaskStatus(ENHTNTaskStatus NewStatus);
 
+	/** Returns the current running task */
+	UNHTNPrimitiveTask* GetCurrentTask() const;
+
 private:
 	/** Contains the tasks used to run the HTN */
 	UPROPERTY(EditAnywhere, Category = "NHTN")
@@ -71,6 +78,7 @@ private:
 
 	bool bRunning = false;
 	bool bPaused = false;
+	bool bPlanning = false;
 
 	/** The current task index from the InitializedTasks array that is currently running */
 	int32 CurrentTask = INDEX_NONE;
