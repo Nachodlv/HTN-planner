@@ -3,11 +3,11 @@
 - [X] Basic building blocks
   - [X] Primitive Tasks
   - [X] Compound Tasks
-- [ ] Override Brain Component
+- [X] Override Brain Component
   - [X] Handle world state
-  - [ ] Handle tasks
-  - [ ] Handle domain
-  - [ ] Handle messages
+  - [X] Handle tasks
+  - [X] Handle domain
+  - [X] Handle messages
 - [ ] Planner
 - [ ] Planner runner
 
