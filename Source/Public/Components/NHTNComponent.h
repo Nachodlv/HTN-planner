@@ -14,6 +14,34 @@ class AAIController;
 
 class UNHTNDomain;
 
+/** Contains the information regarding a task subscribed to a message */
+struct FNHTNMessageObserver
+{
+	FNHTNMessageObserver(const UNHTNPrimitiveTask* InTask, const FName& InMessage,
+		const FAIMessageObserverHandle& InObserverHandle, const FAIRequestID& InRequestID = FAIRequestID::AnyRequest)
+		: Task(InTask), Message(InMessage), ObserverHandle(InObserverHandle), RequestID(InRequestID) {}
+
+	FNHTNMessageObserver(const UNHTNPrimitiveTask* InTask, const FName& InMessage,
+		const FAIRequestID& InRequestID = FAIRequestID::AnyRequest)
+		: Task(InTask), Message(InMessage), RequestID(InRequestID) {}
+
+	/** The task that made the subscription */
+	TWeakObjectPtr<const UNHTNPrimitiveTask> Task;
+
+	/** The message name subscribed to */
+	FName Message;
+
+	/** The subscription handle. If destroyed, the subscription will be unregistered */
+	FAIMessageObserverHandle ObserverHandle;
+
+	FAIRequestID RequestID;
+
+	friend bool operator==(const FNHTNMessageObserver& Rhs, const FNHTNMessageObserver& Lhs)
+	{
+		return Rhs.Task == Lhs.Task && Rhs.Message == Lhs.Message && Rhs.RequestID == Lhs.RequestID;
+	}
+};
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class NHTN_API UNHTNComponent : public UBrainComponent
 {
@@ -40,6 +68,15 @@ public:
 	/** Changes the status of the current running task */
 	void FinishLatentTask(ENHTNTaskStatus Status);
 
+	/** Registers the task to the given Message. Will be automatically unregistered when the task finishes running */
+	void RegisterMessageObserver(UNHTNPrimitiveTask* PrimitiveTask, const FName& Message);
+	void RegisterMessageObserver(UNHTNPrimitiveTask* PrimitiveTask, const FName& Message,
+		const FAIRequestID& InRequestID);
+
+	/** Unregisters the task from a previous registered message */
+	void UnRegisterMessageObserver(const UNHTNPrimitiveTask* PrimitiveTask, const FName& Message,
+		const FAIRequestID& InRequestID = FAIRequestID::AnyRequest);
+
 protected:
 	// ~ Begin UBrainComponent
 	virtual bool IsRunning() const override { return bRunning; }
@@ -64,6 +101,9 @@ protected:
 	/** Returns the current running task */
 	UNHTNPrimitiveTask* GetCurrentTask() const;
 
+	/** Removes all the message observers of the given task */
+	void RemoveTaskMessageObservers(int32 TaskIndex);
+
 private:
 	/** Contains the tasks used to run the HTN */
 	UPROPERTY(EditAnywhere, Category = "NHTN")
@@ -72,6 +112,9 @@ private:
 	/** The current plan that is being executed */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UNHTNPrimitiveTask>> Plan;
+
+	/** The message observers from the current plan's tasks */
+	TArray<FNHTNMessageObserver> MessageObservers;
 
 	/** Whether the tasks from the domain where initialized */
 	bool bInitialized = false;

@@ -2,11 +2,20 @@
 
 // UE Includes
 #include "Algo/AllOf.h"
+#include "Algo/RemoveIf.h"
+
+#if ENABLE_VISUAL_LOG
+#include "VisualLogger/VisualLogger.h"
+#endif // ENABLE_VISUAL_LOG
 
 // NHTN Includes
 #include "Components/NHTNBlackboardComponent.h"
 #include "Domain/NHTNDomain.h"
 #include "Tasks/NHTNCompoundTask.h"
+
+#if ENABLE_VISUAL_LOG
+#include "Types/NHTNTypes.h"
+#endif // ENABLE_VISUAL_LOG
 
 namespace NHTNComponentHelper
 {
@@ -67,6 +76,7 @@ void UNHTNComponent::RestartLogic()
 		{
 			GetCurrentTask()->AbortTask(*this);
 		}
+		MessageObservers.Reset();
 		// TODO (Ignacio) we should stop planning if it was async
 		CurrentTask = INDEX_NONE;
 	}
@@ -103,7 +113,38 @@ void UNHTNComponent::FinishLatentTask(ENHTNTaskStatus Status)
 	{
 		GetCurrentTask()->AbortTask(*this);
 	}
+	RemoveTaskMessageObservers(CurrentTask);
 	SetCurrentTaskStatus(Status);
+}
+
+void UNHTNComponent::RegisterMessageObserver(UNHTNPrimitiveTask* PrimitiveTask, const FName& Message)
+{
+	FAIMessageObserverHandle Observer = FAIMessageObserver::Create(this, Message,
+		FOnAIMessage::CreateUObject(PrimitiveTask, &UNHTNPrimitiveTask::OnWrappedMessage));
+	MessageObservers.Emplace(PrimitiveTask, Message, Observer);
+
+	UE_VLOG(GetOwner(), LogHTN, Log, TEXT("[%s] registering message observer (%s)"),
+		*PrimitiveTask->GetTitleDescription(), *Message.ToString());
+}
+
+void UNHTNComponent::RegisterMessageObserver(UNHTNPrimitiveTask* PrimitiveTask, const FName& Message,
+	const FAIRequestID& InRequestID)
+{
+	FAIMessageObserverHandle Observer = FAIMessageObserver::Create(this, Message, InRequestID,
+		FOnAIMessage::CreateUObject(PrimitiveTask, &UNHTNPrimitiveTask::OnWrappedMessage));
+	MessageObservers.Emplace(PrimitiveTask, Message, Observer, InRequestID);
+
+	UE_VLOG(GetOwner(), LogHTN, Log, TEXT("[%s] registering message observer (%s)"),
+		*PrimitiveTask->GetTitleDescription(), *Message.ToString());
+}
+
+void UNHTNComponent::UnRegisterMessageObserver(const UNHTNPrimitiveTask* PrimitiveTask, const FName& Message,
+	const FAIRequestID& InRequestID)
+{
+	MessageObservers.RemoveSwap(FNHTNMessageObserver(PrimitiveTask, Message, InRequestID));
+
+	UE_VLOG(GetOwner(), LogHTN, Log, TEXT("[%s] unregistering message observer (%s)"),
+		*PrimitiveTask->GetTitleDescription(), *Message.ToString());
 }
 
 void UNHTNComponent::Cleanup()
@@ -117,12 +158,15 @@ void UNHTNComponent::Cleanup()
 void UNHTNComponent::HandleMessage(const FAIMessage& Message)
 {
 	Super::HandleMessage(Message);
-	// TODO (Ignacio) handle messages
-	// ensureMsgf(false, TEXT("Not handling messages yet"));
+	UE_VLOG(GetOwner(), LogHTN, Log, TEXT("Message received (%s)"), *Message.MessageName.ToString());
+	SetComponentTickEnabled(true);
 }
 
 void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	bool bNeedsTicking = false;
 	if (bRunning && !bPaused)
 	{
 		bool bNeedsPlanning = Plan.Num() == 0;
@@ -133,6 +177,7 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 			if (Plan.IsValidIndex(CurrentTask) && Plan[CurrentTask]->CanBeExecuted(*GetBlackboardComponent()))
 			{
 				SetCurrentTaskStatus(Plan[CurrentTask]->ExecuteTask(*this));
+				bNeedsTicking = CurrentTaskStatus != ENHTNTaskStatus::InProgress;
 			}
 			else
 			{
@@ -142,10 +187,15 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 		if (bNeedsPlanning)
 		{
+			bNeedsTicking = true;
 			bPlanning = true;
 			StartPlanning();
 			CurrentTask = INDEX_NONE;
 		}
+	}
+	if (!bNeedsTicking)
+	{
+		SetComponentTickEnabled(false);
 	}
 }
 
@@ -200,11 +250,25 @@ void UNHTNComponent::SetCurrentTaskStatus(ENHTNTaskStatus NewStatus)
 		GetCurrentTask()->ApplyEffects(*GetBlackboardComponent());
 	}
 	CurrentTaskStatus = NewStatus;
+	SetComponentTickEnabled(true);
 }
 
 UNHTNPrimitiveTask* UNHTNComponent::GetCurrentTask() const
 {
 	return Plan[CurrentTask];
+}
+
+void UNHTNComponent::RemoveTaskMessageObservers(int32 TaskIndex)
+{
+	UNHTNPrimitiveTask* Task = Plan[TaskIndex];
+	AActor* OwnerActor = GetOwner();
+	Algo::RemoveIf(MessageObservers, [Task, OwnerActor](const FNHTNMessageObserver& MessageObserver)
+	{
+		UE_VLOG(OwnerActor, LogHTN, Log, TEXT("[%s] unregistering message observer (%s)"),
+			MessageObserver.Task.IsValid() ? *MessageObserver.Task->GetTitleDescription() : TEXT("None"),
+			*MessageObserver.Message.ToString());
+		return MessageObserver.Task == Task;
+	});
 }
 
 
