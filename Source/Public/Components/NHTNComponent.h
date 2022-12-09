@@ -77,6 +77,10 @@ public:
 	void UnRegisterMessageObserver(const UNHTNPrimitiveTask* PrimitiveTask, const FName& Message,
 		const FAIRequestID& InRequestID = FAIRequestID::AnyRequest);
 
+	UFUNCTION(BlueprintPure)
+	UNHTNBlackboardComponent* GetHTNBBComp();
+	const UNHTNBlackboardComponent* GetHTNBBComp() const;
+	
 protected:
 	// ~ Begin UBrainComponent
 	virtual bool IsRunning() const override { return bRunning; }
@@ -91,9 +95,6 @@ protected:
 	// TODO (Ignacio) move to a manager or something
 	/** Creates a new plan based on the Domain assigned */
 	void StartPlanning();
-
-	UFUNCTION(BlueprintPure)
-	UNHTNBlackboardComponent* GetHTNBBComp();
 
 	/** Sets the status of the current running tasks. Executes its effects if necessary */
 	void SetCurrentTaskStatus(ENHTNTaskStatus NewStatus);

@@ -3,7 +3,7 @@
 
 #include "Tasks/NHTNDecorator.h"
 
-bool UNHTNDecorator::CanBeExecuted(const UBlackboardComponent& WorldState) const
+bool UNHTNDecorator::CanBeExecuted(const UNHTNBlackboardComponent& WorldState) const
 {
 	const bool bResult = CalculateRawCondition(WorldState);
 	return bInverse ? !bResult : bResult;

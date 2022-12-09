@@ -31,7 +31,7 @@ namespace NHTNGameplayDebugger
 		 return FString::Printf(TEXT("{%s}'%s'"), *DescribeColorHelper(Color), *Text);
 	}
 
-	FString GetNodeDescription(const UNHTNBaseTask* Task, bool bRunningTask, const UBlackboardComponent& BBComp)
+	FString GetNodeDescription(const UNHTNBaseTask* Task, bool bRunningTask, const UNHTNBlackboardComponent& BBComp)
 	{
 		FString Description = Task->GetTitleDescription();
 		if (bRunningTask)
@@ -66,8 +66,8 @@ void FNHTNGameplayDebugger_HTN::CollectData(APlayerController* OwnerPC, AActor* 
 	{
 		return;
 	}
-
-	const UBlackboardComponent& BBComp = *HTNComp->GetBlackboardComponent();
+	
+	const UNHTNBlackboardComponent& BBComp = *HTNComp->GetHTNBBComp();
 
 	DebugData.DebugPlan.Reset();
 
@@ -75,7 +75,7 @@ void FNHTNGameplayDebugger_HTN::CollectData(APlayerController* OwnerPC, AActor* 
 	FNHTNDebugNode* LastNode = nullptr;
 	for (int32 i = 0; i < HTNComp->Plan.Num(); ++i)
 	{
-		bool bRunningTask = HTNComp->CurrentTask == i;
+		const bool bRunningTask = HTNComp->CurrentTask == i;
 		
 		const UNHTNPrimitiveTask* PlanTask = HTNComp->Plan[i];
 		FNHTNDebugNode DebugNode;

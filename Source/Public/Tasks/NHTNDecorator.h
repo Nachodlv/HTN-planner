@@ -18,11 +18,11 @@ class NHTN_API UNHTNDecorator : public UNHTNBaseNode
 public:
 	/** Whether the decorator can be executed by the planner. Children should no override this function.
 	 * Override UNHTNDecorator::CalculateRawCondition instead */
-	bool CanBeExecuted(const UBlackboardComponent& WorldState) const override;
+	bool CanBeExecuted(const UNHTNBlackboardComponent& WorldState) const override;
 
 protected:
 	/** The condition that will be check without any modifier from the decorator itself as bInverse */
-	virtual bool CalculateRawCondition(const UBlackboardComponent& WorldState) const { return true; }
+	virtual bool CalculateRawCondition(const UNHTNBlackboardComponent& WorldState) const { return true; }
 
 	/** Returns whether the result of UNHTNDecorator::CalculateRawCondition will be inversed */
 	bool IsConditionInversed() const { return bInverse; }

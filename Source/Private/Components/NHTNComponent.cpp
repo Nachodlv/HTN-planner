@@ -20,7 +20,7 @@
 namespace NHTNComponentHelper
 {
 	template<typename T>
-	bool CanAllBeExecuted(const TArray<T>& Nodes, const UBlackboardComponent& WorldState)
+	bool CanAllBeExecuted(const TArray<T>& Nodes, const UNHTNBlackboardComponent& WorldState)
 	{
 		return Algo::AllOf(Nodes, [&WorldState](const T Node)
 		{
@@ -174,7 +174,7 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		if (!bNeedsPlanning && (CurrentTask == INDEX_NONE || CurrentTaskStatus != ENHTNTaskStatus::InProgress))
 		{
 			++CurrentTask;
-			if (Plan.IsValidIndex(CurrentTask) && Plan[CurrentTask]->CanBeExecuted(*GetBlackboardComponent()))
+			if (Plan.IsValidIndex(CurrentTask) && Plan[CurrentTask]->CanBeExecuted(*GetHTNBBComp()))
 			{
 				SetCurrentTaskStatus(Plan[CurrentTask]->ExecuteTask(*this));
 				bNeedsTicking = CurrentTaskStatus != ENHTNTaskStatus::InProgress;
@@ -239,6 +239,11 @@ void UNHTNComponent::StartPlanning()
 }
 
 UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp()
+{
+	return Cast<UNHTNBlackboardComponent>(GetBlackboardComponent());
+}
+
+const UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp() const
 {
 	return Cast<UNHTNBlackboardComponent>(GetBlackboardComponent());
 }

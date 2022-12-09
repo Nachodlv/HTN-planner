@@ -21,7 +21,7 @@ public:
 	virtual void ApplyEffects(UBlackboardComponent& WorldState) const {}
 
 	/** Applies the corresponding effects to the world state as if the task was executed. Only used on planning. */
-	virtual void ApplyExpectedEffects(UBlackboardComponent& WorldState) const {}
+	virtual void ApplyExpectedEffects(UNHTNBlackboardComponent& WorldState) const {}
 
 	/** Called when the brain component received a message. Calls UNHTNPrimitiveTask::OnMessage */
 	void OnWrappedMessage(UBrainComponent* BrainComponent, const FAIMessage& Message);
