@@ -66,6 +66,11 @@ void UNHTNBlackboardComponent::RemoveExpectedKeyToBeSet(FBlackboard::FKey KeyId)
 	ExpectedKeysToBeSet.Remove(KeyId);
 }
 
+void UNHTNBlackboardComponent::RemoveExpectedKeyToBeSet(const FName& KeyName)
+{
+	RemoveExpectedKeyToBeSet(GetKeyID(KeyName));
+}
+
 TOptional<FVector> UNHTNBlackboardComponent::TryGetLocationFromEntry(FBlackboard::FKey KeyId) const
 {
 	FVector Location = FVector::ZeroVector;

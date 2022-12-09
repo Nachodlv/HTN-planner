@@ -55,6 +55,7 @@ public:
 
 	/** Removes the key from the expected keys to be set */
 	void RemoveExpectedKeyToBeSet(FBlackboard::FKey KeyId);
+	void RemoveExpectedKeyToBeSet(const FName& KeyName);
 
 	/** Returns the location stored in the key if any. Takes into account the expected keys to be set */
 	TOptional<FVector> TryGetLocationFromEntry(FBlackboard::FKey KeyId) const;
