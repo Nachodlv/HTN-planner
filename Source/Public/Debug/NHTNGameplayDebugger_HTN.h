@@ -58,6 +58,7 @@ protected:
 		FNHTNDebugData() {}
 
 		TArray<FNHTNDebugNode> DebugPlan;
+		FString BlackboardValues;
 
 		FNHTNDebugData(const FNHTNDebugData& Other) = delete;
 		void operator=(const FNHTNDebugData& Other) = delete;
@@ -74,7 +75,9 @@ protected:
 		void Move(FNHTNDebugData& Other)
 		{
 			DebugPlan = MoveTemp(Other.DebugPlan);
+			BlackboardValues = MoveTemp(Other.BlackboardValues);
 			Other.DebugPlan.Reset();
+			Other.BlackboardValues.Reset();
 		}
 	};
 

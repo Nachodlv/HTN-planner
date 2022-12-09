@@ -69,6 +69,7 @@ void FNHTNGameplayDebugger_HTN::CollectData(APlayerController* OwnerPC, AActor* 
 	
 	const UNHTNBlackboardComponent& BBComp = *HTNComp->GetHTNBBComp();
 
+	DebugData.BlackboardValues = BBComp.GetDebugInfoString(EBlackboardDescription::KeyWithValue);
 	DebugData.DebugPlan.Reset();
 
 	const UNHTNBaseTask* LastParent = nullptr;
@@ -107,15 +108,41 @@ void FNHTNGameplayDebugger_HTN::CollectData(APlayerController* OwnerPC, AActor* 
 			LastNode = &DebugData.DebugPlan.Add_GetRef(MoveTemp(DebugNode));
 		}
 	}
-
-	for (FNHTNDebugNode& DebugNode : DebugData.DebugPlan)
-	{
-		AddTextLine(DebugNode.ToString(0));
-	}
 }
 
 void FNHTNGameplayDebugger_HTN::DrawData(APlayerController* OwnerPC, FGameplayDebuggerCanvasContext& CanvasContext)
 {
+	for (FNHTNDebugNode& DebugNode : DebugData.DebugPlan)
+	{
+		CanvasContext.Print(DebugNode.ToString(0));
+	}
+
+	TArray<FString> BlackboardLines;
+	DebugData.BlackboardValues.ParseIntoArrayLines(BlackboardLines, true);
+
+	const int32 SavedDefX = CanvasContext.DefaultX;
+	const int32 SavedPosY = CanvasContext.CursorY;
+	CanvasContext.DefaultX = CanvasContext.CursorX = 600.0f;
+	CanvasContext.CursorY = CanvasContext.DefaultY;
+
+	for (int32 Idx = 0; Idx < BlackboardLines.Num(); Idx++)
+	{
+		int32 SeparatorIndex = INDEX_NONE;
+		BlackboardLines[Idx].FindChar(TEXT(':'), SeparatorIndex);
+
+		if (SeparatorIndex != INDEX_NONE && Idx)
+		{
+			FString ColoredLine = BlackboardLines[Idx].Left(SeparatorIndex + 1) + FString(TEXT("{yellow}")) + BlackboardLines[Idx].Mid(SeparatorIndex + 1);
+			CanvasContext.Print(ColoredLine);
+		}
+		else
+		{
+			CanvasContext.Print(BlackboardLines[Idx]);
+		}
+	}
+
+	CanvasContext.DefaultX = CanvasContext.CursorX = SavedDefX;
+	CanvasContext.CursorY = SavedPosY;
 }
 
 FArchive& FNHTNGameplayDebugger_HTN::FNHTNDebugNode::operator<<(FArchive& Ar)
@@ -149,5 +176,6 @@ FString FNHTNGameplayDebugger_HTN::FNHTNDebugNode::ToString(int32 Depth) const
 void FNHTNGameplayDebugger_HTN::FNHTNDebugData::Serialize(FArchive& Ar)
 {
 	Ar << DebugPlan;
+	Ar << BlackboardValues;
 }
 
