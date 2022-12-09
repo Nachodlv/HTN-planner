@@ -9,7 +9,12 @@
   - [X] Handle domain
   - [X] Handle messages
 - [ ] Planner
+  - [ ] Basic planning
+  - [ ] Restore points
 - [ ] Planner runner
+  - [ ] Multi thread or distributed in multiple frames?
+  - [ ] Plan queue
+- [ ] Observe world state changes for re-plan
 
 ## Improvements
 - [ ] Custom instancing of domain
