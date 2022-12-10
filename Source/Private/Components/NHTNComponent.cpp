@@ -203,15 +203,17 @@ void UNHTNComponent::StartPlanning()
 {
 	UNHTNBlackboardComponent& BBComp = *GetHTNBBComp();
 	// Save the current memory from the blackboard to restore after the planning has finished
-	FNHTNBlackboardMemory BBMemory = BBComp.RetrieveBBMemory();
+	FNHTNBlackboardMemory InitialWorldState = BBComp.RetrieveBBMemory();
 	
 	Plan.Reset();
-	
-	TArray<UNHTNBaseTask*> StackPlan;
-	NHTNComponentHelper::PushAllReversed(StackPlan, Domain->GetTasks());
-	while (!StackPlan.IsEmpty())
+
+	TArray<FNHTNSavedWorldState> SavedWorldStates;
+	FWeakPrimitiveTasks CurrentPlan;
+	FWeakTasks TasksToVisit;
+	NHTNComponentHelper::PushAllReversed(TasksToVisit, Domain->GetTasks());
+	while (!TasksToVisit.IsEmpty())
 	{
-		UNHTNBaseTask* Task = StackPlan.Pop();
+		UNHTNBaseTask* Task = TasksToVisit.Pop().Get();
 		if (const UNHTNCompoundTask* CompoundTask = Cast<UNHTNCompoundTask>(Task))
 		{
 			const TArray<FNHTNMethod>& Methods = CompoundTask->GetMethods();
@@ -219,7 +221,13 @@ void UNHTNComponent::StartPlanning()
 			{
 				if (NHTNComponentHelper::CanAllBeExecuted(Method.Decorators, BBComp))
 				{
-					NHTNComponentHelper::PushAllReversed(StackPlan, Method.Tasks);
+					// Save world state
+					SavedWorldStates.Emplace(BBComp.RetrieveBBMemory(), CurrentPlan, TasksToVisit);
+					NHTNComponentHelper::PushAllReversed(TasksToVisit, Method.Tasks);
+				}
+				else
+				{
+					RollbackWorldState(BBComp, CurrentPlan, TasksToVisit, SavedWorldStates);
 				}
 			}
 		}
@@ -229,13 +237,34 @@ void UNHTNComponent::StartPlanning()
 			if (PrimitiveTask->CanBeExecuted(BBComp))
 			{
 				PrimitiveTask->ApplyExpectedEffects(BBComp);
-				Plan.Add(PrimitiveTask);
+				CurrentPlan.Add(PrimitiveTask);
+			}
+			else
+			{
+				RollbackWorldState(BBComp, CurrentPlan, TasksToVisit, SavedWorldStates);
 			}
 		}
 	}
 
 	// Restore memory from blackboard
-	BBComp.SetBBMemory(BBMemory);
+	BBComp.SetBBMemory(InitialWorldState);
+	Algo::Transform(CurrentPlan, Plan,
+		[](const TWeakObjectPtr<UNHTNPrimitiveTask>& Task) { return Task.Get(); });
+}
+
+void UNHTNComponent::RollbackWorldState(UNHTNBlackboardComponent& BBComp, FWeakPrimitiveTasks& InPlan,
+	FWeakTasks& InTasksToVisit, TArray<FNHTNSavedWorldState>& SavedWorldStates) const
+{
+	if (SavedWorldStates.IsEmpty())
+	{
+		// No possible rollback
+		return;
+	}
+	FNHTNSavedWorldState& LastSavedWorldState = SavedWorldStates.Last();
+	InPlan = MoveTemp(LastSavedWorldState.Plan);
+	InTasksToVisit = MoveTemp(LastSavedWorldState.TasksToVisit);
+	BBComp.SetBBMemory(LastSavedWorldState.Memory);
+	SavedWorldStates.Pop();
 }
 
 UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp()

@@ -42,6 +42,19 @@ struct FNHTNMessageObserver
 	}
 };
 
+typedef TArray<TWeakObjectPtr<UNHTNBaseTask>> FWeakTasks;
+typedef TArray<TWeakObjectPtr<UNHTNPrimitiveTask>> FWeakPrimitiveTasks;
+
+struct FNHTNSavedWorldState
+{
+	FNHTNSavedWorldState(FNHTNBlackboardMemory&& InMemory, const FWeakPrimitiveTasks& InPlan,
+		const FWeakTasks& InTasksToVisit)
+		: Memory(MoveTemp(InMemory)), Plan(InPlan), TasksToVisit(InTasksToVisit) {}
+	FNHTNBlackboardMemory Memory;
+	FWeakPrimitiveTasks Plan;
+	FWeakTasks TasksToVisit;
+};
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class NHTN_API UNHTNComponent : public UBrainComponent
 {
@@ -104,6 +117,10 @@ protected:
 
 	/** Removes all the message observers of the given task */
 	void RemoveTaskMessageObservers(int32 TaskIndex);
+
+	/** Rollbacks the blackboard memory, plan and tasks to visit from the last saved world state */
+	void RollbackWorldState(UNHTNBlackboardComponent& BBComp, FWeakPrimitiveTasks& InPlan, FWeakTasks& InTasksToVisit,
+		TArray<FNHTNSavedWorldState>& SavedWorldStates) const;
 
 private:
 	/** Contains the tasks used to run the HTN */
