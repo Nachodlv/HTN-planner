@@ -20,11 +20,11 @@ void ANHTNAIController::RunHTN()
 		HTNBBComp= NewObject<UNHTNBlackboardComponent>(this, FName(TEXT("NHTNBlackboardComponent")));
 		HTNBBComp->RegisterComponent();
 	}
+	Blackboard = HTNBBComp;
 	
 	if (const UNHTNDomain* DomainLoaded = Domain.LoadSynchronous())
 	{
-		UBlackboardComponent* BBComp;
-		UseBlackboard(DomainLoaded->GetBlackboardAsset(), BBComp);
+		InitializeBlackboard(*HTNBBComp, *DomainLoaded->GetBlackboardAsset());
 	}
 	HTNComponent->SetDomain(Domain);
 	HTNComponent->StartLogic();

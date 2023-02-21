@@ -1,3 +1,3 @@
 ﻿#include "Types/NHTNTypes.h"
 
-DEFINE_LOG_CATEGORY(LogHTN);
+DEFINE_LOG_CATEGORY(LogNHTN);

@@ -53,11 +53,17 @@ void UNHTNComponent::StartLogic()
 		{
 			return;
 		}
-		const TArray<UNHTNBaseTask*>& Tasks = DomainPtr->GetTasks();
+		const TArray<UNHTNBaseTask*>& DomainTasks = DomainPtr->GetTasks();
+		TasksInstances.Reset();
+		TasksInstances.Reserve(DomainTasks.Num());
+		for (const UNHTNBaseTask* DomainTask : DomainTasks)
+		{
+			TasksInstances.Add(DuplicateObject(DomainTask, this));
+		}
 		
-		ensureMsgf(Tasks.Num() != 0, TEXT("No tasks to run"));
+		ensureMsgf(TasksInstances.Num() != 0, TEXT("No tasks to run"));
 		
-		for (UNHTNBaseTask* Task : Tasks)
+		for (UNHTNBaseTask* Task : TasksInstances)
 		{
 			Task->InitializeTask(*this);
 		}
@@ -123,7 +129,7 @@ void UNHTNComponent::RegisterMessageObserver(UNHTNPrimitiveTask* PrimitiveTask, 
 		FOnAIMessage::CreateUObject(PrimitiveTask, &UNHTNPrimitiveTask::OnWrappedMessage));
 	MessageObservers.Emplace(PrimitiveTask, Message, Observer);
 
-	UE_VLOG(GetOwner(), LogHTN, Log, TEXT("[%s] registering message observer (%s)"),
+	UE_VLOG(GetOwner(), LogNHTN, Log, TEXT("[%s] registering message observer (%s)"),
 		*PrimitiveTask->GetTitleDescription(), *Message.ToString());
 }
 
@@ -134,7 +140,7 @@ void UNHTNComponent::RegisterMessageObserver(UNHTNPrimitiveTask* PrimitiveTask, 
 		FOnAIMessage::CreateUObject(PrimitiveTask, &UNHTNPrimitiveTask::OnWrappedMessage));
 	MessageObservers.Emplace(PrimitiveTask, Message, Observer, InRequestID);
 
-	UE_VLOG(GetOwner(), LogHTN, Log, TEXT("[%s] registering message observer (%s)"),
+	UE_VLOG(GetOwner(), LogNHTN, Log, TEXT("[%s] registering message observer (%s)"),
 		*PrimitiveTask->GetTitleDescription(), *Message.ToString());
 }
 
@@ -143,7 +149,7 @@ void UNHTNComponent::UnRegisterMessageObserver(const UNHTNPrimitiveTask* Primiti
 {
 	MessageObservers.RemoveSwap(FNHTNMessageObserver(PrimitiveTask, Message, InRequestID));
 
-	UE_VLOG(GetOwner(), LogHTN, Log, TEXT("[%s] unregistering message observer (%s)"),
+	UE_VLOG(GetOwner(), LogNHTN, Log, TEXT("[%s] unregistering message observer (%s)"),
 		*PrimitiveTask->GetTitleDescription(), *Message.ToString());
 }
 
@@ -158,7 +164,7 @@ void UNHTNComponent::Cleanup()
 void UNHTNComponent::HandleMessage(const FAIMessage& Message)
 {
 	Super::HandleMessage(Message);
-	UE_VLOG(GetOwner(), LogHTN, Log, TEXT("Message received (%s)"), *Message.MessageName.ToString());
+	UE_VLOG(GetOwner(), LogNHTN, Log, TEXT("Message received (%s)"), *Message.MessageName.ToString());
 	SetComponentTickEnabled(true);
 }
 
@@ -169,7 +175,7 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	bool bNeedsTicking = false;
 	if (bRunning && !bPaused)
 	{
-		bool bNeedsPlanning = Plan.Num() == 0;
+		bool bNeedsPlanning = Plan.Num() == 0 || CurrentTaskStatus == ENHTNTaskStatus::Failed;
 		
 		if (!bNeedsPlanning && (CurrentTask == INDEX_NONE || CurrentTaskStatus != ENHTNTaskStatus::InProgress))
 		{
@@ -210,7 +216,7 @@ void UNHTNComponent::StartPlanning()
 	TArray<FNHTNSavedWorldState> SavedWorldStates;
 	FWeakPrimitiveTasks CurrentPlan;
 	FWeakTasks TasksToVisit;
-	NHTNComponentHelper::PushAllReversed(TasksToVisit, Domain->GetTasks());
+	NHTNComponentHelper::PushAllReversed(TasksToVisit, TasksInstances);
 	while (!TasksToVisit.IsEmpty())
 	{
 		UNHTNBaseTask* Task = TasksToVisit.Pop().Get();
@@ -227,7 +233,7 @@ void UNHTNComponent::StartPlanning()
 				}
 				else
 				{
-					RollbackWorldState(BBComp, CurrentPlan, TasksToVisit, SavedWorldStates);
+					// RollbackWorldState(BBComp, CurrentPlan, TasksToVisit, SavedWorldStates);
 				}
 			}
 		}
@@ -279,12 +285,19 @@ const UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp() const
 
 void UNHTNComponent::SetCurrentTaskStatus(ENHTNTaskStatus NewStatus)
 {
+	const UNHTNPrimitiveTask* CurrentTaskNode = GetCurrentTask();
+	ENHTNTaskStatus OldStatus = CurrentTaskStatus;
+	
 	if (NewStatus == ENHTNTaskStatus::Success && IsRunning())
 	{
-		GetCurrentTask()->ApplyEffects(*GetBlackboardComponent());
+		CurrentTaskNode->ApplyEffects(*GetBlackboardComponent());
 	}
 	CurrentTaskStatus = NewStatus;
 	SetComponentTickEnabled(true);
+	
+	UE_VLOG(GetOwner(), LogNHTN, Log, TEXT("[%s] changing status from (%s) to (%s)"),
+		*GetNameSafe(CurrentTaskNode),
+		*NHTN_ENUM_TO_STRING(ENHTNTaskStatus, OldStatus), *NHTN_ENUM_TO_STRING(ENHTNTaskStatus, NewStatus));
 }
 
 UNHTNPrimitiveTask* UNHTNComponent::GetCurrentTask() const
@@ -298,7 +311,7 @@ void UNHTNComponent::RemoveTaskMessageObservers(int32 TaskIndex)
 	AActor* OwnerActor = GetOwner();
 	Algo::RemoveIf(MessageObservers, [Task, OwnerActor](const FNHTNMessageObserver& MessageObserver)
 	{
-		UE_VLOG(OwnerActor, LogHTN, Log, TEXT("[%s] unregistering message observer (%s)"),
+		UE_VLOG(OwnerActor, LogNHTN, Log, TEXT("[%s] unregistering message observer (%s)"),
 			MessageObserver.Task.IsValid() ? *MessageObserver.Task->GetTitleDescription() : TEXT("None"),
 			*MessageObserver.Message.ToString());
 		return MessageObserver.Task == Task;

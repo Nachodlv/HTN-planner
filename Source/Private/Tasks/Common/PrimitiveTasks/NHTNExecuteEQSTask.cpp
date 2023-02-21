@@ -23,7 +23,7 @@ UNHTNExecuteEQSTask::UNHTNExecuteEQSTask()
 ENHTNTaskStatus UNHTNExecuteEQSTask::ExecuteTask(UNHTNComponent& HTNComp)
 {
 	FQueryFinishedSignature Delegate = FQueryFinishedSignature::CreateUObject(this, &UNHTNExecuteEQSTask::OnEQSFinished, &HTNComp);
-	QueryID = EQS.Execute(*HTNComp.GetAIOwner(), HTNComp.GetBlackboardComponent(), Delegate);
+	QueryID = EQS.Execute(*HTNComp.GetAIOwner()->GetPawn(), HTNComp.GetBlackboardComponent(), Delegate);
 	return QueryID == INDEX_NONE ? ENHTNTaskStatus::Failed : ENHTNTaskStatus::InProgress;
 }
 

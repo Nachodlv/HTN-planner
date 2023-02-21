@@ -127,6 +127,10 @@ private:
 	UPROPERTY(EditAnywhere, Category = "NHTN")
 	TSoftObjectPtr<UNHTNDomain> Domain;
 
+	/** The tasks instanced from the Domain */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UNHTNBaseTask>> TasksInstances;
+
 	/** The current plan that is being executed */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UNHTNPrimitiveTask>> Plan;

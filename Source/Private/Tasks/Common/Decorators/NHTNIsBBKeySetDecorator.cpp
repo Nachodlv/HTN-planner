@@ -12,6 +12,6 @@ bool UNHTNIsBBKeySetDecorator::CalculateRawCondition(const UNHTNBlackboardCompon
 	}
 	const TSubclassOf<UBlackboardKeyType> KeyType = WorldState.GetKeyType(KeyID);
 	const UBlackboardKeyType* KeyCDO = KeyType->GetDefaultObject<UBlackboardKeyType>();
-	const uint8* KeyMemory = WorldState.GetKeyRawData(BBKey.GetSelectedKeyID());
+	const uint8* KeyMemory = WorldState.GetKeyRawData(KeyID);
 	return KeyCDO->WrappedTestBasicOperation(WorldState, KeyMemory, EBasicKeyOperation::Set);
 }
