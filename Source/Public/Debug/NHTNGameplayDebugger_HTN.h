@@ -37,14 +37,6 @@ protected:
 		{
 			Move(Other);
 		}
-
-		FArchive& operator<<(FArchive& Ar);
-		friend FArchive& operator<<(FArchive& Ar, FNHTNDebugNode& Node)
-		{
-			Node.Serialize(Ar);
-			return Ar;
-		}
-		void Serialize(FArchive& Ar);
 		void Move(FNHTNDebugNode& Other)
 		{
 			DebugText = MoveTemp(Other.DebugText);
@@ -57,7 +49,7 @@ protected:
 	{
 		FNHTNDebugData() {}
 
-		TArray<FNHTNDebugNode> DebugPlan;
+		TArray<FString> DebugPlan;
 		FString BlackboardValues;
 
 		FNHTNDebugData(const FNHTNDebugData& Other) = delete;

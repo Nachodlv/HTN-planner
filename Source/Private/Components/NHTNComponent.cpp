@@ -256,6 +256,10 @@ void UNHTNComponent::StartPlanning()
 	BBComp.SetBBMemory(InitialWorldState);
 	Algo::Transform(CurrentPlan, Plan,
 		[](const TWeakObjectPtr<UNHTNPrimitiveTask>& Task) { return Task.Get(); });
+
+	CurrentTaskStatus = ENHTNTaskStatus::Success;
+
+	UE_VLOG_UELOG(GetOwner(), LogNHTN, Log, TEXT("New Plan created containing %d tasks"), Plan.Num());
 }
 
 void UNHTNComponent::RollbackWorldState(UNHTNBlackboardComponent& BBComp, FWeakPrimitiveTasks& InPlan,
@@ -281,6 +285,30 @@ UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp()
 const UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp() const
 {
 	return Cast<UNHTNBlackboardComponent>(GetBlackboardComponent());
+}
+
+void UNHTNComponent::DescribeSelfToVisLog(FVisualLogEntry* Snapshot) const
+{
+	Super::DescribeSelfToVisLog(Snapshot);
+	if (IsRunning() && !bPlanning)
+	{
+		const UNHTNBlackboardComponent& WorldState = *GetHTNBBComp();
+		FVisualLogStatusCategory& NHTNComponentCategory = Snapshot->Status.Emplace_GetRef(TEXT("NHTN Component"));
+		const UNHTNPrimitiveTask* RunningTask = GetCurrentTask();
+		const FString DebugTask = FString::Printf(TEXT("%s, %s"), *RunningTask->GetTitleDescription(),
+			*RunningTask->GetRuntimeDescription(WorldState));
+		NHTNComponentCategory.Add(FString(TEXT("Running")), DebugTask);
+	}
+
+	if (Plan.Num() > 0)
+	{
+		FVisualLogStatusCategory& PlanCategory = Snapshot->Status.Emplace_GetRef(TEXT("Current Plan"));
+		for (int32 i = 0; i < Plan.Num(); ++i)
+		{
+			const FString Index = FString::Printf(TEXT("%s%d"), CurrentTask == i ? TEXT("*") : TEXT(""), i); 
+			PlanCategory.Add(Index, *Plan[i]->GetTitleDescription());
+		}
+	}
 }
 
 void UNHTNComponent::SetCurrentTaskStatus(ENHTNTaskStatus NewStatus)

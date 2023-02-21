@@ -72,6 +72,8 @@ void FNHTNGameplayDebugger_HTN::CollectData(APlayerController* OwnerPC, AActor* 
 	DebugData.BlackboardValues = BBComp.GetDebugInfoString(EBlackboardDescription::KeyWithValue);
 	DebugData.DebugPlan.Reset();
 
+	TArray<FNHTNDebugNode> DebugNodes;
+
 	const UNHTNBaseTask* LastParent = nullptr;
 	FNHTNDebugNode* LastNode = nullptr;
 	for (int32 i = 0; i < HTNComp->Plan.Num(); ++i)
@@ -105,16 +107,21 @@ void FNHTNGameplayDebugger_HTN::CollectData(APlayerController* OwnerPC, AActor* 
 		else
 		{
 			LastParent = CurrentTask;
-			LastNode = &DebugData.DebugPlan.Add_GetRef(MoveTemp(DebugNode));
+			LastNode = &DebugNodes.Add_GetRef(MoveTemp(DebugNode));
 		}
+	}
+
+	for (FNHTNDebugNode& Node : DebugNodes)
+	{
+		DebugData.DebugPlan.Add(Node.ToString(0));
 	}
 }
 
 void FNHTNGameplayDebugger_HTN::DrawData(APlayerController* OwnerPC, FGameplayDebuggerCanvasContext& CanvasContext)
 {
-	for (FNHTNDebugNode& DebugNode : DebugData.DebugPlan)
+	for (const FString& DebugString : DebugData.DebugPlan)
 	{
-		CanvasContext.Print(DebugNode.ToString(0));
+		CanvasContext.Print(DebugString);
 	}
 
 	TArray<FString> BlackboardLines;
@@ -143,18 +150,6 @@ void FNHTNGameplayDebugger_HTN::DrawData(APlayerController* OwnerPC, FGameplayDe
 
 	CanvasContext.DefaultX = CanvasContext.CursorX = SavedDefX;
 	CanvasContext.CursorY = SavedPosY;
-}
-
-FArchive& FNHTNGameplayDebugger_HTN::FNHTNDebugNode::operator<<(FArchive& Ar)
-{
-	Serialize(Ar);
-	return Ar;
-}
-
-void FNHTNGameplayDebugger_HTN::FNHTNDebugNode::Serialize(FArchive& Ar)
-{
-	Ar << DebugText;
-	Ar << Children;
 }
 
 FString FNHTNGameplayDebugger_HTN::FNHTNDebugNode::ToString(int32 Depth) const

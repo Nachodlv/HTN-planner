@@ -93,6 +93,10 @@ public:
 	UFUNCTION(BlueprintPure)
 	UNHTNBlackboardComponent* GetHTNBBComp();
 	const UNHTNBlackboardComponent* GetHTNBBComp() const;
+
+#if ENABLE_VISUAL_LOG
+	virtual void DescribeSelfToVisLog(FVisualLogEntry* Snapshot) const override;
+#endif // ENABLE_VISUAL_LOG
 	
 protected:
 	// ~ Begin UBrainComponent
