@@ -7,6 +7,7 @@
 // NHTN Includes
 #include "NHTNBlackboardComponent.h"
 #include "Tasks/NHTNPrimitiveTask.h"
+#include "Planner/NHTNPlanner.h"
 
 #include "NHTNComponent.generated.h"
 
@@ -40,19 +41,6 @@ struct FNHTNMessageObserver
 	{
 		return Rhs.Task == Lhs.Task && Rhs.Message == Lhs.Message && Rhs.RequestID == Lhs.RequestID;
 	}
-};
-
-typedef TArray<TWeakObjectPtr<UNHTNBaseTask>> FWeakTasks;
-typedef TArray<TWeakObjectPtr<UNHTNPrimitiveTask>> FWeakPrimitiveTasks;
-
-struct FNHTNSavedWorldState
-{
-	FNHTNSavedWorldState(FNHTNBlackboardMemory&& InMemory, const FWeakPrimitiveTasks& InPlan,
-		const FWeakTasks& InTasksToVisit)
-		: Memory(MoveTemp(InMemory)), Plan(InPlan), TasksToVisit(InTasksToVisit) {}
-	FNHTNBlackboardMemory Memory;
-	FWeakPrimitiveTasks Plan;
-	FWeakTasks TasksToVisit;
 };
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -100,7 +88,7 @@ public:
 	
 protected:
 	// ~ Begin UBrainComponent
-	virtual bool IsRunning() const override { return bRunning; }
+	virtual bool IsRunning() const override;
 	virtual bool IsPaused() const override { return bPaused; }
 	virtual void Cleanup() override;
 	virtual void HandleMessage(const FAIMessage& Message) override;
@@ -109,9 +97,11 @@ protected:
 	/** Runs the corresponding task */
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	// TODO (Ignacio) move to a manager or something
-	/** Creates a new plan based on the Domain assigned */
+	/** Makes a request for a new plan */
 	void StartPlanning();
+
+	/** Assigns the new generated plan. Called when the planner finishes the generation of the plan */
+	void PlanFinished(FNHTNPlanResult Result);
 
 	/** Sets the status of the current running tasks. Executes its effects if necessary */
 	void SetCurrentTaskStatus(ENHTNTaskStatus NewStatus);
@@ -121,10 +111,6 @@ protected:
 
 	/** Removes all the message observers of the given task */
 	void RemoveTaskMessageObservers(int32 TaskIndex);
-
-	/** Rollbacks the blackboard memory, plan and tasks to visit from the last saved world state */
-	void RollbackWorldState(UNHTNBlackboardComponent& BBComp, FWeakPrimitiveTasks& InPlan, FWeakTasks& InTasksToVisit,
-		TArray<FNHTNSavedWorldState>& SavedWorldStates) const;
 
 private:
 	/** Contains the tasks used to run the HTN */
@@ -145,7 +131,6 @@ private:
 	/** Whether the tasks from the domain where initialized */
 	bool bInitialized = false;
 
-	bool bRunning = false;
 	bool bPaused = false;
 	bool bPlanning = false;
 
@@ -154,4 +139,6 @@ private:
 
 	/** The tasks status that is currently running */
 	ENHTNTaskStatus CurrentTaskStatus = ENHTNTaskStatus::Success;
+
+	int32 CurrentPlanRequest = INDEX_NONE;
 };

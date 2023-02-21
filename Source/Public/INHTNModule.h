@@ -4,6 +4,8 @@
 #include "Modules/ModuleInterface.h"
 #include "Modules/ModuleManager.h"
 
+class UNHTNPlanner;
+
 class INHTNModule : public IModuleInterface
 {
 public:
@@ -31,4 +33,12 @@ public:
 		QUICK_SCOPE_CYCLE_COUNTER(STAT_IPMTAIModule_IsAvailable);
 		return FModuleManager::Get().IsModuleLoaded("NHTN");
 	}
+
+	virtual void StartupModule() override;
+	virtual void ShutdownModule() override;
+
+	UNHTNPlanner* GetPlanner();
+
+private:
+	UNHTNPlanner* Planner = nullptr;
 };

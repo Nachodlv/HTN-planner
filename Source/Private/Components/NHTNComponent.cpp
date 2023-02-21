@@ -9,39 +9,20 @@
 #endif // ENABLE_VISUAL_LOG
 
 // NHTN Includes
+#include "INHTNModule.h"
 #include "Components/NHTNBlackboardComponent.h"
 #include "Domain/NHTNDomain.h"
+#include "Planner/NHTNPlanner.h"
 #include "Tasks/NHTNCompoundTask.h"
 
 #if ENABLE_VISUAL_LOG
 #include "Types/NHTNTypes.h"
 #endif // ENABLE_VISUAL_LOG
 
-namespace NHTNComponentHelper
-{
-	template<typename T>
-	bool CanAllBeExecuted(const TArray<T>& Nodes, const UNHTNBlackboardComponent& WorldState)
-	{
-		return Algo::AllOf(Nodes, [&WorldState](const T Node)
-		{
-			return Node->CanBeExecuted(WorldState);
-		});
-	}
-
-	template<typename T, typename O>
-	void PushAllReversed(TArray<T>& Stack, const TArray<O>& Nodes)
-	{
-		Stack.Reserve(Stack.Num() + Nodes.Num());
-		for (int32 i = Nodes.Num() - 1; i >= 0; --i)
-		{
-			Stack.Push(Nodes[i]);
-		}
-	}
-}
-
 UNHTNComponent::UNHTNComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void UNHTNComponent::StartLogic()
@@ -69,8 +50,8 @@ void UNHTNComponent::StartLogic()
 		}
 		bInitialized = true;
 	}
-	bRunning = true;
 	CurrentTask = INDEX_NONE;
+	SetComponentTickEnabled(true);
 }
 
 void UNHTNComponent::RestartLogic()
@@ -83,16 +64,17 @@ void UNHTNComponent::RestartLogic()
 			GetCurrentTask()->AbortTask(*this);
 		}
 		MessageObservers.Reset();
-		// TODO (Ignacio) we should stop planning if it was async
 		CurrentTask = INDEX_NONE;
 	}
+	INHTNModule::Get().GetPlanner()->AbortPlan(CurrentPlanRequest);
+	bPlanning = false;
+	CurrentTaskStatus = ENHTNTaskStatus::Success;
 }
 
 void UNHTNComponent::StopLogic(const FString& Reason)
 {
 	Super::StopLogic(Reason);
 	RestartLogic();
-	bRunning = false;
 	bPaused = false;
 }
 
@@ -109,7 +91,6 @@ EAILogicResuming::Type UNHTNComponent::ResumeLogic(const FString& Reason)
 		StartLogic();
 		return EAILogicResuming::RestartedInstead;
 	}
-	bRunning = true;
 	return EAILogicResuming::Continue;
 }
 
@@ -173,7 +154,7 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	bool bNeedsTicking = false;
-	if (bRunning && !bPaused)
+	if (!bPaused)
 	{
 		bool bNeedsPlanning = Plan.Num() == 0 || CurrentTaskStatus == ENHTNTaskStatus::Failed;
 		
@@ -194,7 +175,6 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		if (bNeedsPlanning)
 		{
 			bNeedsTicking = true;
-			bPlanning = true;
 			StartPlanning();
 			CurrentTask = INDEX_NONE;
 		}
@@ -207,74 +187,27 @@ void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 void UNHTNComponent::StartPlanning()
 {
-	UNHTNBlackboardComponent& BBComp = *GetHTNBBComp();
-	// Save the current memory from the blackboard to restore after the planning has finished
-	FNHTNBlackboardMemory InitialWorldState = BBComp.RetrieveBBMemory();
-	
+	bPlanning = true;
+
 	Plan.Reset();
 
-	TArray<FNHTNSavedWorldState> SavedWorldStates;
-	FWeakPrimitiveTasks CurrentPlan;
-	FWeakTasks TasksToVisit;
-	NHTNComponentHelper::PushAllReversed(TasksToVisit, TasksInstances);
-	while (!TasksToVisit.IsEmpty())
-	{
-		UNHTNBaseTask* Task = TasksToVisit.Pop().Get();
-		if (const UNHTNCompoundTask* CompoundTask = Cast<UNHTNCompoundTask>(Task))
-		{
-			const TArray<FNHTNMethod>& Methods = CompoundTask->GetMethods();
-			for (const FNHTNMethod& Method : Methods)
-			{
-				if (NHTNComponentHelper::CanAllBeExecuted(Method.Decorators, BBComp))
-				{
-					// Save world state
-					SavedWorldStates.Emplace(BBComp.RetrieveBBMemory(), CurrentPlan, TasksToVisit);
-					NHTNComponentHelper::PushAllReversed(TasksToVisit, Method.Tasks);
-				}
-				else
-				{
-					// RollbackWorldState(BBComp, CurrentPlan, TasksToVisit, SavedWorldStates);
-				}
-			}
-		}
-		else
-		{
-			UNHTNPrimitiveTask* PrimitiveTask = CastChecked<UNHTNPrimitiveTask>(Task);
-			if (PrimitiveTask->CanBeExecuted(BBComp))
-			{
-				PrimitiveTask->ApplyExpectedEffects(BBComp);
-				CurrentPlan.Add(PrimitiveTask);
-			}
-			else
-			{
-				RollbackWorldState(BBComp, CurrentPlan, TasksToVisit, SavedWorldStates);
-			}
-		}
-	}
-
-	// Restore memory from blackboard
-	BBComp.SetBBMemory(InitialWorldState);
-	Algo::Transform(CurrentPlan, Plan,
-		[](const TWeakObjectPtr<UNHTNPrimitiveTask>& Task) { return Task.Get(); });
-
-	CurrentTaskStatus = ENHTNTaskStatus::Success;
-
-	UE_VLOG_UELOG(GetOwner(), LogNHTN, Log, TEXT("New Plan created containing %d tasks"), Plan.Num());
+	UNHTNPlanner* Planner = INHTNModule::Get().GetPlanner();
+	FNHTNPlanRequest Request;
+	Request.TasksInstances = TasksInstances;
+	Request.NHTNComponent = this;
+	Request.Delegate.BindUObject(this, &UNHTNComponent::PlanFinished);
+	CurrentPlanRequest = Planner->GeneratePlan(MoveTemp(Request));
+	
+	UE_VLOG_UELOG(GetOwner(), LogNHTN, Log, TEXT("Plan requested with index: %d"), CurrentPlanRequest);
 }
 
-void UNHTNComponent::RollbackWorldState(UNHTNBlackboardComponent& BBComp, FWeakPrimitiveTasks& InPlan,
-	FWeakTasks& InTasksToVisit, TArray<FNHTNSavedWorldState>& SavedWorldStates) const
+void UNHTNComponent::PlanFinished(FNHTNPlanResult Result)
 {
-	if (SavedWorldStates.IsEmpty())
-	{
-		// No possible rollback
-		return;
-	}
-	FNHTNSavedWorldState& LastSavedWorldState = SavedWorldStates.Last();
-	InPlan = MoveTemp(LastSavedWorldState.Plan);
-	InTasksToVisit = MoveTemp(LastSavedWorldState.TasksToVisit);
-	BBComp.SetBBMemory(LastSavedWorldState.Memory);
-	SavedWorldStates.Pop();
+	Algo::Transform(Result.Plan, Plan,
+		[](const TWeakObjectPtr<UNHTNPrimitiveTask>& Task) { return Task.Get(); });
+	CurrentTaskStatus = ENHTNTaskStatus::Success;
+	UE_VLOG_UELOG(GetOwner(), LogNHTN, Log, TEXT("New Plan created containing %d tasks"), Plan.Num());
+	bPlanning = false;
 }
 
 UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp()
@@ -309,6 +242,11 @@ void UNHTNComponent::DescribeSelfToVisLog(FVisualLogEntry* Snapshot) const
 			PlanCategory.Add(Index, *Plan[i]->GetTitleDescription());
 		}
 	}
+}
+
+bool UNHTNComponent::IsRunning() const
+{
+	return Plan.IsValidIndex(CurrentTask);
 }
 
 void UNHTNComponent::SetCurrentTaskStatus(ENHTNTaskStatus NewStatus)
