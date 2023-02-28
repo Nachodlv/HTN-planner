@@ -34,10 +34,10 @@ UNHTNPlanner::UNHTNPlanner()
 	PlannerClass = UNHTNPlanner::StaticClass();
 }
 
-int32 UNHTNPlanner::GeneratePlan(FNHTNPlanRequest&& Request)
+int32 UNHTNPlanner::GeneratePlan(FNHTNPlanRequestParams&& Request)
 {
 	static int32 RequestID = 0;
-	FNHTNPlanRequest& NewRequest = Requests.Add_GetRef(MoveTemp(Request));
+	FNHTNPlanRequest& NewRequest = Requests.Emplace_GetRef(MoveTemp(Request));
 	NewRequest.UniqueID = ++RequestID;
 	return NewRequest.UniqueID;
 }
@@ -71,70 +71,86 @@ void UNHTNPlanner::Tick(float DeltaTime)
 		return;
 	}
 
-	MakePlan(Requests[0]);
-	Requests.RemoveAt(0);
+	float RemainingTime = MaxTimePlanning;
+	while (!Requests.IsEmpty())
+	{
+		const float StartIterationTime = FPlatformTime::Seconds();
+		FNHTNPlanRequest& Request = Requests[NextRequestIndex];
+		check(Request.PlanResult.State == ENHTNPlanState::Waiting || Request.PlanResult.State == ENHTNPlanState::InProgress);
+		if (Request.IsWaitingToBeProcessed())
+		{
+			NHTNPlannerHelper::PushAllReversed(Request.TasksToVisit, Request.Params.TasksInstances);
+			Request.PlanResult.State = ENHTNPlanState::InProgress;
+		}
+		UNHTNBlackboardComponent& BBComp = *Request.Params.NHTNComponent->GetHTNBBComp();
+		FNHTNBlackboardMemory InitialWorldState = BBComp.RetrieveBBMemory();
+		MakeOnePlanStep(Request);
+		BBComp.SetBBMemory(InitialWorldState);
+
+		if (Request.TasksToVisit.IsEmpty())
+		{
+			Request.PlanResult.State = Request.PlanResult.Plan.Num() > 0 ? ENHTNPlanState::Finished : ENHTNPlanState::Failed;
+			Request.Params.Delegate.ExecuteIfBound(MoveTemp(Request.PlanResult));
+			Requests.RemoveAt(NextRequestIndex);
+		}
+		else if (bPlanUsingBreadth)
+		{
+			NextRequestIndex = (NextRequestIndex + 1) % Requests.Num();
+		}
+
+		RemainingTime -= FPlatformTime::Seconds() - StartIterationTime;
+		if (bSlicePlanning && RemainingTime <= 0.0f)
+		{
+			// No more time for this frame
+			break;
+		}
+	}
 }
 
-void UNHTNPlanner::MakePlan(const FNHTNPlanRequest& Request) const
+void UNHTNPlanner::MakeOnePlanStep(FNHTNPlanRequest& Request) const
 {
-	UNHTNBlackboardComponent& BBComp = *Request.NHTNComponent->GetHTNBBComp();
-	// Save the current memory from the blackboard to restore after the planning has finished
-	FNHTNBlackboardMemory InitialWorldState = BBComp.RetrieveBBMemory();
-	
-	TArray<FNHTNSavedWorldState> SavedWorldStates;
-	FNHTNPlanResult PlanResult;
-	FWeakTasks TasksToVisit;
-	NHTNPlannerHelper::PushAllReversed(TasksToVisit, Request.TasksInstances);
-	while (!TasksToVisit.IsEmpty())
+	UNHTNBlackboardComponent& BBComp = *Request.Params.NHTNComponent->GetHTNBBComp();
+	UNHTNBaseTask* Task = Request.TasksToVisit.Pop().Get();
+	if (const UNHTNCompoundTask* CompoundTask = Cast<UNHTNCompoundTask>(Task))
 	{
-		UNHTNBaseTask* Task = TasksToVisit.Pop().Get();
-		if (const UNHTNCompoundTask* CompoundTask = Cast<UNHTNCompoundTask>(Task))
+		const TArray<FNHTNMethod>& Methods = CompoundTask->GetMethods();
+		for (const FNHTNMethod& Method : Methods)
 		{
-			const TArray<FNHTNMethod>& Methods = CompoundTask->GetMethods();
-			for (const FNHTNMethod& Method : Methods)
+			if (NHTNPlannerHelper::CanAllBeExecuted(Method.Decorators, BBComp))
 			{
-				if (NHTNPlannerHelper::CanAllBeExecuted(Method.Decorators, BBComp))
-				{
-					// Save world state
-					SavedWorldStates.Emplace(BBComp.RetrieveBBMemory(), PlanResult.Plan, TasksToVisit);
-					NHTNPlannerHelper::PushAllReversed(TasksToVisit, Method.Tasks);
-				}
-			}
-		}
-		else
-		{
-			UNHTNPrimitiveTask* PrimitiveTask = CastChecked<UNHTNPrimitiveTask>(Task);
-			if (PrimitiveTask->CanBeExecuted(BBComp))
-			{
-				PrimitiveTask->ApplyExpectedEffects(BBComp);
-				PlanResult.Plan.Add(PrimitiveTask);
-			}
-			else
-			{
-				RollbackWorldState(BBComp, PlanResult.Plan, TasksToVisit, SavedWorldStates);
+				// Save world state
+				Request.SavedWorldStates.Emplace(BBComp.RetrieveBBMemory(), Request.PlanResult.Plan, Request.TasksToVisit);
+				NHTNPlannerHelper::PushAllReversed(Request.TasksToVisit, Method.Tasks);
 			}
 		}
 	}
-
-	// Restore memory from blackboard
-	BBComp.SetBBMemory(InitialWorldState);
-	PlanResult.Result = PlanResult.Plan.Num() > 0 ? ENHTNPlanResult::Success : ENHTNPlanResult::Failed;
-	Request.Delegate.ExecuteIfBound(MoveTemp(PlanResult));
+	else
+	{
+		UNHTNPrimitiveTask* PrimitiveTask = CastChecked<UNHTNPrimitiveTask>(Task);
+		if (PrimitiveTask->CanBeExecuted(BBComp))
+		{
+			PrimitiveTask->ApplyExpectedEffects(BBComp);
+			Request.PlanResult.Plan.Add(PrimitiveTask);
+		}
+		else
+		{
+			RollbackWorldState(Request, BBComp);
+		}
+	}
 }
 
 
-void UNHTNPlanner::RollbackWorldState(UNHTNBlackboardComponent& BBComp, FWeakPrimitiveTasks& InPlan,
-	FWeakTasks& InTasksToVisit, TArray<FNHTNSavedWorldState>& SavedWorldStates) const
+void UNHTNPlanner::RollbackWorldState(FNHTNPlanRequest& Request, UNHTNBlackboardComponent& BBComp) const
 {
-	if (SavedWorldStates.IsEmpty())
+	if (Request.SavedWorldStates.IsEmpty())
 	{
 		// No possible rollback
 		return;
 	}
-	FNHTNSavedWorldState& LastSavedWorldState = SavedWorldStates.Last();
-	InPlan = MoveTemp(LastSavedWorldState.Plan);
-	InTasksToVisit = MoveTemp(LastSavedWorldState.TasksToVisit);
+	FNHTNSavedWorldState& LastSavedWorldState = Request.SavedWorldStates.Last();
+	Request.PlanResult.Plan = MoveTemp(LastSavedWorldState.Plan);
+	Request.TasksToVisit = MoveTemp(LastSavedWorldState.TasksToVisit);
 	BBComp.SetBBMemory(LastSavedWorldState.Memory);
-	SavedWorldStates.Pop();
+	Request.SavedWorldStates.Pop();
 }
 
