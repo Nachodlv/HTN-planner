@@ -2,7 +2,6 @@
 
 // UE Includes
 #include "CoreMinimal.h"
-#include "UObject/Object.h"
 
 // NHTN Includes
 #include "Tasks/NHTNPrimitiveTask.h"
@@ -21,7 +20,7 @@ public:
 	virtual void AbortTask(UNHTNComponent& HTNComp) override;
 
 protected:
-	void OnWaitTimeEnded() const;
+	void OnWaitTimeEnded();
 	
 private:
 	/** The time the task will stay in progress before finishing */

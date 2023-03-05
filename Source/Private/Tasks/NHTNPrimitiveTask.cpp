@@ -10,7 +10,7 @@ void UNHTNPrimitiveTask::OnWrappedMessage(UBrainComponent* BrainComponent, const
 
 void UNHTNPrimitiveTask::FinishLatentTask(UNHTNComponent& HTNComp, ENHTNTaskStatus Status)
 {
-	HTNComp.FinishLatentTask(Status);
+	HTNComp.FinishLatentTask(this, Status);
 }
 
 void UNHTNPrimitiveTask::RegisterMessageObserver(UNHTNComponent& HTNComp, const FName& Message,

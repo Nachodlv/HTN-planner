@@ -2,6 +2,7 @@
 
 // UE Includes
 #include "Algo/AllOf.h"
+#include "VisualLogger/VisualLogger.h"
 
 // NHTN Includes
 #include "Components/NHTNComponent.h"
@@ -44,6 +45,11 @@ int32 UNHTNPlanner::GeneratePlan(FNHTNPlanRequestParams&& Request)
 
 void UNHTNPlanner::AbortPlan(int32 RequestID)
 {
+	if (Requests.IsEmpty())
+	{
+		return;
+	}
+
 	for (int32 i = 0; i < Requests.Num(); ++i)
 	{
 		if (Requests[i].UniqueID == RequestID)
@@ -51,6 +57,12 @@ void UNHTNPlanner::AbortPlan(int32 RequestID)
 			Requests.RemoveAt(i);
 			break;
 		}
+	}
+
+	// Check if we deleted the last request and it was the one to be processed next
+	if (!Requests.IsValidIndex(NextRequestIndex))
+	{
+		NextRequestIndex = Requests.IsEmpty() ? 0 : (NextRequestIndex + 1) % Requests.Num();
 	}
 }
 
@@ -82,23 +94,26 @@ void UNHTNPlanner::Tick(float DeltaTime)
 			NHTNPlannerHelper::PushAllReversed(Request.TasksToVisit, Request.Params.TasksInstances);
 			Request.PlanResult.State = ENHTNPlanState::InProgress;
 		}
-		UNHTNBlackboardComponent& BBComp = *Request.Params.NHTNComponent->GetHTNBBComp();
-		FNHTNBlackboardMemory InitialWorldState = BBComp.RetrieveBBMemory();
-		MakeOnePlanStep(Request);
-		BBComp.SetBBMemory(InitialWorldState);
-
+		if (Request.Params.NHTNComponent.IsValid())
+		{
+			UNHTNBlackboardComponent& BBComp = *Request.Params.NHTNComponent->GetHTNBBComp();
+			FNHTNBlackboardMemory InitialWorldState = BBComp.RetrieveBBMemory();
+			MakeOnePlanStep(Request);
+			BBComp.SetBBMemory(InitialWorldState);
+		}
 		if (Request.TasksToVisit.IsEmpty())
 		{
 			Request.PlanResult.State = Request.PlanResult.Plan.Num() > 0 ? ENHTNPlanState::Finished : ENHTNPlanState::Failed;
 			Request.Params.Delegate.ExecuteIfBound(MoveTemp(Request.PlanResult));
 			Requests.RemoveAt(NextRequestIndex);
+			NextRequestIndex = NextRequestIndex == Requests.Num() ? 0 : NextRequestIndex;
 		}
 		else if (bPlanUsingBreadth)
 		{
 			NextRequestIndex = (NextRequestIndex + 1) % Requests.Num();
 		}
 
-		RemainingTime -= FPlatformTime::Seconds() - StartIterationTime;
+		RemainingTime -= FMath::Min(FPlatformTime::Seconds() - StartIterationTime, 0.001f);
 		if (bSlicePlanning && RemainingTime <= 0.0f)
 		{
 			// No more time for this frame

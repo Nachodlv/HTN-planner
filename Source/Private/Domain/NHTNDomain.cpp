@@ -1,7 +1,8 @@
 ﻿#include "Domain/NHTNDomain.h"
 
+// NHTN Includes
+#include "Domain/Observers/NHTNKeyObserver.h"
 #include "Tasks/NHTNBaseTask.h"
-
 
 #if WITH_EDITOR
 
@@ -27,6 +28,17 @@ void UNHTNDomain::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedE
 			}
 		}
 	}
+
+	if (bBlackboardChanged || PropertyName == GET_MEMBER_NAME_CHECKED(UNHTNDomain, ObservedKeys))
+	{
+		for (UNHTNKeyObserver* ObservedKey : ObservedKeys)
+		{
+			if (ObservedKey)
+			{
+				ResolveBlackboardKeysFromObject(ObservedKey);
+			}
+		}
+	}
 }
 
 #define GET_STRUCT_NAME_CHECKED(StructName) \
@@ -34,7 +46,6 @@ void UNHTNDomain::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedE
 
 void UNHTNDomain::ResolveBlackboardKeysFromObject(UObject* Object) const
 {
-	const UBlackboardData* BBData = GetBlackboardAsset();
 	for (const FProperty* TestProperty = Object->GetClass()->PropertyLink; TestProperty; TestProperty = TestProperty->PropertyLinkNext)
 	{
 		const FStructProperty* TestStruct = CastField<FStructProperty>(TestProperty);
@@ -47,17 +58,23 @@ void UNHTNDomain::ResolveBlackboardKeysFromObject(UObject* Object) const
 		if (TypeDesc.Contains(GET_STRUCT_NAME_CHECKED(FBlackboardKeySelector)))
 		{
 			FBlackboardKeySelector* PropertyValue = TestStruct->ContainerPtrToValuePtr<FBlackboardKeySelector>(Object);
-			if (BBData)
-			{
-				PropertyValue->ResolveSelectedKey(*BBData);
-			} else
-			{
-				PropertyValue->InvalidateResolvedKey();
-			}
+			ResolveBlackboardKeySelector(*PropertyValue);
 		}
 	}
 }
 
 #undef GET_STRUCT_NAME_CHECKED
+
+void UNHTNDomain::ResolveBlackboardKeySelector(FBlackboardKeySelector& KeySelector) const
+{
+	if (const UBlackboardData* BBData = GetBlackboardAsset())
+	{
+		KeySelector.ResolveSelectedKey(*BBData);
+	} else
+	{
+		KeySelector.InvalidateResolvedKey();
+	}
+}
+
 
 #endif // WITH_EDITOR

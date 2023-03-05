@@ -31,7 +31,7 @@ public:
 
 protected:
 	/** Changes the state of the current task */
-	static void FinishLatentTask(UNHTNComponent& HTNComp, ENHTNTaskStatus Status);
+	void FinishLatentTask(UNHTNComponent& HTNComp, ENHTNTaskStatus Status);
 
 	/** Registers to the given Message */
 	void RegisterMessageObserver(UNHTNComponent& HTNComp, const FName& Message);

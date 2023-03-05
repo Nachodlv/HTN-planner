@@ -13,6 +13,7 @@
 
 class AAIController;
 
+class UNHTNKeyObserver;
 class UNHTNDomain;
 
 /** Contains the information regarding a task subscribed to a message */
@@ -61,13 +62,15 @@ public:
 	virtual void StopLogic(const FString& Reason) override;
 	virtual void PauseLogic(const FString& Reason) override;
 	virtual EAILogicResuming::Type ResumeLogic(const FString& Reason) override;
+	virtual bool IsRunning() const override;
+	virtual bool IsPaused() const override { return bPaused; }
 	// ~ End UBrainComponent
 
 	/** Sets the domain that will be run when the HTN is executed */
 	void SetDomain(const TSoftObjectPtr<UNHTNDomain>& HTNDomain) { Domain = HTNDomain; }
 
 	/** Changes the status of the current running task */
-	void FinishLatentTask(ENHTNTaskStatus Status);
+	void FinishLatentTask(UNHTNPrimitiveTask* Task, ENHTNTaskStatus Status);
 
 	/** Registers the task to the given Message. Will be automatically unregistered when the task finishes running */
 	void RegisterMessageObserver(UNHTNPrimitiveTask* PrimitiveTask, const FName& Message);
@@ -82,14 +85,16 @@ public:
 	UNHTNBlackboardComponent* GetHTNBBComp();
 	const UNHTNBlackboardComponent* GetHTNBBComp() const;
 
+	/** Resets the current plan. It does not affect the current task running */
+	UFUNCTION(BlueprintCallable)
+	void ResetPlan();
+
 #if ENABLE_VISUAL_LOG
 	virtual void DescribeSelfToVisLog(FVisualLogEntry* Snapshot) const override;
 #endif // ENABLE_VISUAL_LOG
-	
+
 protected:
 	// ~ Begin UBrainComponent
-	virtual bool IsRunning() const override;
-	virtual bool IsPaused() const override { return bPaused; }
 	virtual void Cleanup() override;
 	virtual void HandleMessage(const FAIMessage& Message) override;
 	// ~ End UBrainComponent
@@ -97,6 +102,9 @@ protected:
 	/** Runs the corresponding task */
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	/** Resets the plan and aborts the current task */
+	virtual void RestartLogic_Internal() ;
+	
 	/** Makes a request for a new plan */
 	void StartPlanning();
 
@@ -110,7 +118,10 @@ protected:
 	UNHTNPrimitiveTask* GetCurrentTask() const;
 
 	/** Removes all the message observers of the given task */
-	void RemoveTaskMessageObservers(int32 TaskIndex);
+	void RemoveTaskMessageObservers(UNHTNPrimitiveTask* Task);
+
+	/** Stops the planer from generating a new plan */
+	void StopPlanning();
 
 private:
 	/** Contains the tasks used to run the HTN */
@@ -132,7 +143,11 @@ private:
 	bool bInitialized = false;
 
 	bool bPaused = false;
+	
 	bool bPlanning = false;
+
+	/** Whether it should restart the plan */
+	bool bRestartLogic = false;
 
 	/** The current task index from the InitializedTasks array that is currently running */
 	int32 CurrentTask = INDEX_NONE;
@@ -141,4 +156,8 @@ private:
 	ENHTNTaskStatus CurrentTaskStatus = ENHTNTaskStatus::Success;
 
 	int32 CurrentPlanRequest = INDEX_NONE;
+
+	/** The current observer watching the blackboard keys */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UNHTNKeyObserver>> ObservedKeys;
 };

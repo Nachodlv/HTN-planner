@@ -24,7 +24,7 @@ void UNHTNWaitTask::AbortTask(UNHTNComponent& HTNComp)
 	TimerManager.ClearTimer(TimerHandle);
 }
 
-void UNHTNWaitTask::OnWaitTimeEnded() const
+void UNHTNWaitTask::OnWaitTimeEnded()
 {
 	FinishLatentTask(*NHTNComponent, ENHTNTaskStatus::Success);
 }

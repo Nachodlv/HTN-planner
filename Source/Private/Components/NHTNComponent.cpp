@@ -12,6 +12,7 @@
 #include "INHTNModule.h"
 #include "Components/NHTNBlackboardComponent.h"
 #include "Domain/NHTNDomain.h"
+#include "Domain/Observers/NHTNKeyObserver.h"
 #include "Planner/NHTNPlanner.h"
 #include "Tasks/NHTNCompoundTask.h"
 
@@ -66,6 +67,13 @@ void UNHTNComponent::StartLogic()
 		}
 		
 		ensureMsgf(TasksInstances.Num() != 0, TEXT("No tasks to run"));
+
+		for (const UNHTNKeyObserver* ObservedKey : DomainPtr->GetObservedKeys())
+		{
+			UNHTNKeyObserver* NewObservedKey = DuplicateObject(ObservedKey, this);
+			NewObservedKey->Initialize(this);
+			ObservedKeys.Add(NewObservedKey);
+		}
 		
 		for (UNHTNBaseTask* Task : TasksInstances)
 		{
@@ -79,7 +87,12 @@ void UNHTNComponent::StartLogic()
 
 void UNHTNComponent::RestartLogic()
 {
-	Super::RestartLogic();
+	bRestartLogic = true;
+	SetComponentTickEnabled(true);
+}
+
+void UNHTNComponent::RestartLogic_Internal()
+{
 	if (IsRunning() && Plan.Num() > 0)
 	{
 		if (!bPlanning)
@@ -89,9 +102,10 @@ void UNHTNComponent::RestartLogic()
 		MessageObservers.Reset();
 		CurrentTask = INDEX_NONE;
 	}
-	INHTNModule::Get().GetPlanner()->AbortPlan(CurrentPlanRequest);
-	bPlanning = false;
+	StopPlanning();
 	CurrentTaskStatus = ENHTNTaskStatus::Success;
+	Plan.Reset();
+	UE_VLOG(GetOwner(), LogNHTN,  Log, TEXT("Plan logic restarted"));
 }
 
 void UNHTNComponent::StopLogic(const FString& Reason)
@@ -117,14 +131,14 @@ EAILogicResuming::Type UNHTNComponent::ResumeLogic(const FString& Reason)
 	return EAILogicResuming::Continue;
 }
 
-void UNHTNComponent::FinishLatentTask(ENHTNTaskStatus Status)
+void UNHTNComponent::FinishLatentTask(UNHTNPrimitiveTask* Task, ENHTNTaskStatus Status)
 {
 	if (IsRunning())
 	{
-		GetCurrentTask()->AbortTask(*this);
+		Task->AbortTask(*this);
+		SetCurrentTaskStatus(Status);
 	}
-	RemoveTaskMessageObservers(CurrentTask);
-	SetCurrentTaskStatus(Status);
+	RemoveTaskMessageObservers(Task);
 }
 
 void UNHTNComponent::RegisterMessageObserver(UNHTNPrimitiveTask* PrimitiveTask, const FName& Message)
@@ -175,6 +189,12 @@ void UNHTNComponent::HandleMessage(const FAIMessage& Message)
 void UNHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (bRestartLogic)
+	{
+		RestartLogic_Internal();
+		bRestartLogic = false;
+	}
 
 	bool bNeedsTicking = false;
 	if (!bPaused && !bPlanning)
@@ -243,6 +263,16 @@ const UNHTNBlackboardComponent* UNHTNComponent::GetHTNBBComp() const
 	return Cast<UNHTNBlackboardComponent>(GetBlackboardComponent());
 }
 
+void UNHTNComponent::ResetPlan()
+{
+	if (bPlanning)
+	{
+		StopPlanning();
+	}
+	Plan.Reset();
+	UE_VLOG(GetOwner(), LogNHTN, Log, TEXT("Plan resetted"));
+}
+
 void UNHTNComponent::DescribeSelfToVisLog(FVisualLogEntry* Snapshot) const
 {
 	Super::DescribeSelfToVisLog(Snapshot);
@@ -294,9 +324,8 @@ UNHTNPrimitiveTask* UNHTNComponent::GetCurrentTask() const
 	return Plan[CurrentTask];
 }
 
-void UNHTNComponent::RemoveTaskMessageObservers(int32 TaskIndex)
+void UNHTNComponent::RemoveTaskMessageObservers(UNHTNPrimitiveTask* Task)
 {
-	UNHTNPrimitiveTask* Task = Plan[TaskIndex];
 	AActor* OwnerActor = GetOwner();
 	Algo::RemoveIf(MessageObservers, [Task, OwnerActor](const FNHTNMessageObserver& MessageObserver)
 	{
@@ -307,6 +336,9 @@ void UNHTNComponent::RemoveTaskMessageObservers(int32 TaskIndex)
 	});
 }
 
-
-
+void UNHTNComponent::StopPlanning()
+{
+	INHTNModule::Get().GetPlanner()->AbortPlan(CurrentPlanRequest);
+	bPlanning = false;
+}
 
