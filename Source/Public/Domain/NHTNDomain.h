@@ -7,8 +7,38 @@
 
 #include "NHTNDomain.generated.h"
 
+class UNHTNPrimitiveTask;
 class UNHTNKeyObserver;
 class UNHTNBaseTask;
+
+/** Iterates the primitive tasks from the given base tasks taking into account the possible compound tasks */
+struct FNHTNPrimitiveTaskIterator
+{
+public:
+	FNHTNPrimitiveTaskIterator(const TArray<TObjectPtr<UNHTNBaseTask>>& InTasks);
+	FNHTNPrimitiveTaskIterator(const TArray<UNHTNBaseTask*>& InTasks);
+
+	UNHTNPrimitiveTask* Get() const { return TasksToVisit[Index].Get(); }
+	UNHTNPrimitiveTask* operator->() const { return Get(); }
+	UNHTNPrimitiveTask* operator*() const { return Get(); }
+
+	void operator++() { ++Index; }
+
+	operator bool() const { return TasksToVisit.IsValidIndex(Index); }
+
+	UNHTNPrimitiveTask* operator[](const int32 InIndex) { return TasksToVisit[InIndex].Get(); }
+
+	bool IsValidIndex(int32 InIndex) const { return TasksToVisit.IsValidIndex(InIndex); }
+
+	const TArray<TWeakObjectPtr<UNHTNPrimitiveTask>>& GetTasksToVisit() const { return TasksToVisit; }
+	
+private:
+	void InitializeTasksToVisit(const TArray<UNHTNBaseTask*>& InTasks);
+
+	TArray<TWeakObjectPtr<UNHTNPrimitiveTask>> TasksToVisit;
+	
+	int32 Index = 0;
+};
 
 UCLASS()
 class NHTN_API UNHTNDomain : public UDataAsset, public IBlackboardAssetProvider

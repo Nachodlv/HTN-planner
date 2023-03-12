@@ -16,6 +16,8 @@ class AAIController;
 class UNHTNKeyObserver;
 class UNHTNDomain;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FNHTNCurrentTaskChangedState, UNHTNComponent*, NHTNComponent, UNHTNPrimitiveTask*, Task, ENHTNTaskStatus, NewStatus);
+
 /** Contains the information regarding a task subscribed to a message */
 struct FNHTNMessageObserver
 {
@@ -92,6 +94,10 @@ public:
 #if ENABLE_VISUAL_LOG
 	virtual void DescribeSelfToVisLog(FVisualLogEntry* Snapshot) const override;
 #endif // ENABLE_VISUAL_LOG
+
+	/** Broadcasts whenever the current task change its state */
+	UPROPERTY(BlueprintAssignable)
+	FNHTNCurrentTaskChangedState OnCurrenTaskStateChanged;
 
 protected:
 	// ~ Begin UBrainComponent

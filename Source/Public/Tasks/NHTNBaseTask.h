@@ -37,7 +37,16 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetParentTask(UNHTNBaseTask* InParentTask) { ParentTask = InParentTask; }
 
+	/** Returns the unique index given by the domain this task belongs to */
+	int32 GetDomainIndex() const { return DomainIndex; }
+	
+	void SetDomainIndex(int32 InIndex) { DomainIndex = InIndex; }
+
 protected:
+	/** The unique index given by the domain this task belongs to */
+	UPROPERTY()
+	int32 DomainIndex = INDEX_NONE;
+	
 	/** The task containing this one. Usually a compound task */
 	UPROPERTY(Transient)
 	TObjectPtr<UNHTNBaseTask> ParentTask = nullptr;

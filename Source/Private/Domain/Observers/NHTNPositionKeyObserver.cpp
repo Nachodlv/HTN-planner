@@ -18,8 +18,19 @@ void UNHTNPositionKeyObserver::Initialize(UNHTNComponent* InHTNComp)
 	Super::Initialize(InHTNComp);
 
 	DistanceThresholdSqr = DistanceThreshold * DistanceThreshold;
+}
 
+void UNHTNPositionKeyObserver::OnBeginRelevance()
+{
+	Super::OnBeginRelevance();
 	UpdateLastKeyPosition();
+}
+
+void UNHTNPositionKeyObserver::OnCeaseRelevance()
+{
+	LastPosition.Reset();
+	bTrackingActorMovement = false;
+	Super::OnCeaseRelevance();
 }
 
 void UNHTNPositionKeyObserver::Tick(float DeltaTime)
@@ -28,7 +39,7 @@ void UNHTNPositionKeyObserver::Tick(float DeltaTime)
 	const FVector ActorLocation = Actor->GetActorLocation();
 	if (IsOutsideDistanceThreshold(ActorLocation))
 	{
-		NotifyKeyChange();
+		ResetCurrentPlan();
 	}
 	UpdateLastKeyPosition();
 }
@@ -57,7 +68,7 @@ EBlackboardNotificationResult UNHTNPositionKeyObserver::OnKeyObservedChange(
 	{
 		if (LastPosition.IsSet() && IsOutsideDistanceThreshold(Location))
 		{
-			NotifyKeyChange();
+			ResetCurrentPlan();
 		}
 	}
 

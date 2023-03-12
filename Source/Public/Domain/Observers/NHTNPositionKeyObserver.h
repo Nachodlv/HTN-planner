@@ -19,8 +19,14 @@ public:
 
 	virtual void Initialize(UNHTNComponent* InHTNComp) override;
 
+	/** Updates the last key position */
+	virtual void OnBeginRelevance() override;
+
+	/** Resets the obervser state */
+	virtual void OnCeaseRelevance() override;
+
 	// ~ Begin FTickableGameObject
-	virtual bool IsTickable() const override { return bTrackingActorMovement; }
+	virtual bool IsTickable() const override { return bTrackingActorMovement && IsRelevant(); }
 	
 	/** Checks whether it should notify the HTN component and updates the last key position */
 	virtual void Tick(float DeltaTime) override;

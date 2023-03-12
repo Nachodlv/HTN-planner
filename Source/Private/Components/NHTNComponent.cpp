@@ -20,29 +20,6 @@
 #include "Types/NHTNTypes.h"
 #endif // ENABLE_VISUAL_LOG
 
-namespace NHTNComponentUtils
-{
-	template<typename T>
-	void FromObjectPtrArrayToWeakPtr(const TArray<TObjectPtr<T>>& InArray, TArray<TWeakObjectPtr<T>>& OutArray)
-	{
-		OutArray.Reserve(InArray.Num());
-		Algo::Transform(InArray, OutArray, [](const TObjectPtr<T>& ObjectPtr)
-		{
-			return ObjectPtr.Get();
-		});
-	}
-
-	template<typename T>
-	void FromWeakPtrArrayToObjectPtr(const TArray<TWeakObjectPtr<T>>& InArray, TArray<TObjectPtr<T>>& OutArray)
-	{
-		OutArray.Reserve(InArray.Num());
-		Algo::Transform(InArray, OutArray, [](const TWeakObjectPtr<T>& ObjectPtr)
-		{
-			return ObjectPtr.Get();
-		});
-	}
-}
-
 UNHTNComponent::UNHTNComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -98,6 +75,7 @@ void UNHTNComponent::RestartLogic_Internal()
 		if (!bPlanning)
 		{
 			GetCurrentTask()->AbortTask(*this);
+			SetCurrentTaskStatus(ENHTNTaskStatus::Failed);
 		}
 		MessageObservers.Reset();
 		CurrentTask = INDEX_NONE;
@@ -236,7 +214,7 @@ void UNHTNComponent::StartPlanning()
 
 	UNHTNPlanner* Planner = INHTNModule::Get().GetPlanner();
 	FNHTNPlanRequestParams Request;
-	NHTNComponentUtils::FromObjectPtrArrayToWeakPtr(TasksInstances, Request.TasksInstances);
+	FNHTNArrayUtils::FromOneTypeArrayToAnother(TasksInstances, Request.TasksInstances);
 	Request.NHTNComponent = this;
 	Request.Delegate.BindUObject(this, &UNHTNComponent::PlanFinished);
 	CurrentPlanRequest = Planner->GeneratePlan(MoveTemp(Request));
@@ -246,7 +224,7 @@ void UNHTNComponent::StartPlanning()
 
 void UNHTNComponent::PlanFinished(FNHTNPlanResult Result)
 {
-	NHTNComponentUtils::FromWeakPtrArrayToObjectPtr(Result.Plan, Plan);
+	FNHTNArrayUtils::FromOneTypeArrayToAnother(Result.Plan, Plan);
 	CurrentTaskStatus = ENHTNTaskStatus::Success;
 	UE_VLOG_UELOG(GetOwner(), LogNHTN, Log, TEXT("New Plan created containing %d tasks"), Plan.Num());
 	bPlanning = false;
@@ -304,7 +282,7 @@ bool UNHTNComponent::IsRunning() const
 
 void UNHTNComponent::SetCurrentTaskStatus(ENHTNTaskStatus NewStatus)
 {
-	const UNHTNPrimitiveTask* CurrentTaskNode = GetCurrentTask();
+	UNHTNPrimitiveTask* CurrentTaskNode = GetCurrentTask();
 	ENHTNTaskStatus OldStatus = CurrentTaskStatus;
 	
 	if (NewStatus == ENHTNTaskStatus::Success && IsRunning())
@@ -313,6 +291,8 @@ void UNHTNComponent::SetCurrentTaskStatus(ENHTNTaskStatus NewStatus)
 	}
 	CurrentTaskStatus = NewStatus;
 	SetComponentTickEnabled(true);
+
+	OnCurrenTaskStateChanged.Broadcast(this, CurrentTaskNode, CurrentTaskStatus);
 	
 	UE_VLOG(GetOwner(), LogNHTN, Log, TEXT("[%s] changing status from (%s) to (%s)"),
 		*GetNameSafe(CurrentTaskNode),

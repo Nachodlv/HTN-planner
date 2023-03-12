@@ -3,6 +3,44 @@
 // NHTN Includes
 #include "Domain/Observers/NHTNKeyObserver.h"
 #include "Tasks/NHTNBaseTask.h"
+#include "Tasks/NHTNCompoundTask.h"
+
+FNHTNPrimitiveTaskIterator::FNHTNPrimitiveTaskIterator(const TArray<TObjectPtr<UNHTNBaseTask>>& InTasks)
+{
+	InitializeTasksToVisit(InTasks);
+}
+
+FNHTNPrimitiveTaskIterator::FNHTNPrimitiveTaskIterator(const TArray<UNHTNBaseTask*>& InTasks)
+{
+	InitializeTasksToVisit(InTasks);
+}
+
+void FNHTNPrimitiveTaskIterator::InitializeTasksToVisit(const TArray<UNHTNBaseTask*>& InTasks)
+{
+	TArray<UNHTNBaseTask*> TasksToProcess= InTasks;
+	Algo::Reverse(TasksToProcess);
+	while (!TasksToProcess.IsEmpty())
+	{
+		UNHTNBaseTask* Task = TasksToProcess.Pop();
+		if (!Task)
+		{
+			continue;
+		}
+		if (const UNHTNCompoundTask* CompoundTask = Cast<UNHTNCompoundTask>(Task))
+		{
+			for (const FNHTNMethod& Method : CompoundTask->GetMethods())
+			{
+				TArray<UNHTNBaseTask*> MethodTasks = Method.Tasks;
+				Algo::Reverse(MethodTasks);
+				TasksToProcess.Append(MethodTasks);
+			}
+		}
+		else
+		{
+			TasksToVisit.Add(CastChecked<UNHTNPrimitiveTask>(Task));
+		}
+	}
+}
 
 #if WITH_EDITOR
 
@@ -36,6 +74,24 @@ void UNHTNDomain::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedE
 			if (ObservedKey)
 			{
 				ResolveBlackboardKeysFromObject(ObservedKey);
+				ObservedKey->SetUpDomain(this);
+			}
+		}
+	}
+
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UNHTNDomain, Tasks))
+	{
+		int32 Index = 0;
+		for (FNHTNPrimitiveTaskIterator It (Tasks); It; ++It)
+		{
+			It->SetDomainIndex(Index);
+			++Index;
+		}
+		for (UNHTNKeyObserver* KeyObserver : ObservedKeys)
+		{
+			if (KeyObserver)
+			{
+				KeyObserver->OnObjectListChanged();
 			}
 		}
 	}

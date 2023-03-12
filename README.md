@@ -14,9 +14,9 @@
 - [X] Planner runner
   - [X] Multi thread or distributed in multiple frames?
   - [X] Plan queue
-- [ ] Observe world state changes for re-plan
+- [X] Observe world state changes for re-plan
   - [X] Implement basic observers
-  - [ ] Add filter to observe only relevant tasks
+  - [X] Add filter to observe only relevant tasks
 
 ## Improvements
 - [ ] Custom instancing of domain

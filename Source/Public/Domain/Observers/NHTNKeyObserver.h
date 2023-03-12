@@ -7,6 +7,7 @@
 
 // NHTN Includes
 #include "Components/NHTNComponent.h"
+#include "Types/ObjectList/NHTNObjectListerContainer.h"
 
 #include "NHTNKeyObserver.generated.h"
 
@@ -21,7 +22,7 @@ enum class ENHTNObservedKeyReplan : uint8
 
 /** Observes a blackboard key for changes and notifies the HTN component when it does */
 UCLASS(EditInlineNew)
-class NHTN_API UNHTNKeyObserver : public UObject
+class NHTN_API UNHTNKeyObserver : public UObject, public INHTNObjectListerContainer
 {
 	GENERATED_BODY()
 
@@ -29,12 +30,29 @@ public:
 	/** Registers to the BlackboardKey change */
 	virtual void Initialize(UNHTNComponent* InHTNComp);
 
+#if WITH_EDITORONLY_DATA
+	void SetUpDomain(UNHTNDomain* InDomain) { Domain = InDomain; }
+#endif // WITH_EDITORONLY_DATA
+
 protected:
 	/** Unregisters to the BlackboardKey change */
 	virtual void BeginDestroy() override;
 
 	/** Notifies the key change */
 	virtual EBlackboardNotificationResult OnKeyObservedChange(const UBlackboardComponent& BlackboardComponent, uint8 KeyID);
+
+	/** Checks whether the current key observer is relevant */
+	UFUNCTION()
+	void OnCurrentTaskStateChanged(UNHTNComponent* HtnComponent, UNHTNPrimitiveTask* Task, ENHTNTaskStatus NewStatus);
+
+	/** Starts observing the blackboard key changes */
+	virtual void OnBeginRelevance();
+
+	/** Stops observing the blackboard key changes */
+	virtual void OnCeaseRelevance();
+
+	/** Returns whether this observer is currently relevant */
+	bool IsRelevant() const { return bRelevant; }
 
 	/** Returns the BlackboardKey value from the blackboard component */
 	template<class TDataClass>
@@ -44,7 +62,25 @@ protected:
 	}
 
 	/** Resets the current plan */
-	void NotifyKeyChange() const;
+	void ResetCurrentPlan() const;
+
+	// ~ Start INHTNObjectListerContainer
+	virtual FNHTNObjectList& GetObjectList() override { return RelevantTasks; }
+
+	/** Returns the primitive tasks that will be listed in the RelevantTasks list */
+	virtual TArray<UObject*> GetObjectsToList() const override;
+
+	/** How the task will be displayed in the RelevantTask list */
+	virtual TTuple<int32, FString> RetrieveNameFromListedObject(int32 ListIndex, const UObject* ListedObject) const override;
+
+	/** Function used to create the selection widget in the editor for the meta property "GetOptions" */
+	UFUNCTION()
+	virtual TArray<FString> RetrieveObjectNames() const override { return INHTNObjectListerContainer::RetrieveObjectNames(); }
+	// ~ End INHTNObjectListerContainer
+	
+#if WITH_EDITOR
+	virtual void PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent) override;
+#endif // WITH_EDITOR
 
 	/** The key that will be observed */
 	UPROPERTY(EditAnywhere, Category = "NHTN")
@@ -54,7 +90,20 @@ protected:
 	TObjectPtr<UNHTNComponent> HTNComp = nullptr;
 	
 private:
+#if WITH_EDITORONLY_DATA
+	/** Used to list the primitive tasks for the RelevantTasks select */
+	UPROPERTY()
+	TObjectPtr<UNHTNDomain> Domain = nullptr;
+#endif // WITH_EDITORONLY_DATA
+	
 	/** How the observer will handle the key change */
 	UPROPERTY(EditAnywhere, Category = "NHTN")
 	ENHTNObservedKeyReplan ReplanType;
+
+	/** The tasks this observer will be relevant. If empty it will be relevant during all the plan */
+	UPROPERTY(EditAnywhere, Category = "NHTN")
+	FNHTNObjectList RelevantTasks;
+
+	/** Whether this observer is currently relevant */
+	bool bRelevant = false;
 };
