@@ -39,7 +39,7 @@ protected:
 	virtual void BeginDestroy() override;
 
 	/** Notifies the key change */
-	virtual EBlackboardNotificationResult OnKeyObservedChange(const UBlackboardComponent& BlackboardComponent, uint8 KeyID);
+	virtual EBlackboardNotificationResult OnKeyObservedChange(const UBlackboardComponent& BlackboardComponent, FBlackboard::FKey KeyID);
 
 	/** Checks whether the current key observer is relevant */
 	UFUNCTION()

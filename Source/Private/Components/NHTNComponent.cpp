@@ -307,13 +307,17 @@ UNHTNPrimitiveTask* UNHTNComponent::GetCurrentTask() const
 void UNHTNComponent::RemoveTaskMessageObservers(UNHTNPrimitiveTask* Task)
 {
 	AActor* OwnerActor = GetOwner();
-	Algo::RemoveIf(MessageObservers, [Task, OwnerActor](const FNHTNMessageObserver& MessageObserver)
+	for (int32 i = MessageObservers.Num() - 1; i >= 0; --i)
 	{
-		UE_VLOG(OwnerActor, LogNHTN, Log, TEXT("[%s] unregistering message observer (%s)"),
-			MessageObserver.Task.IsValid() ? *MessageObserver.Task->GetTitleDescription() : TEXT("None"),
-			*MessageObserver.Message.ToString());
-		return MessageObserver.Task == Task;
-	});
+		const FNHTNMessageObserver& MessageObserver = MessageObservers[i];
+		if (MessageObserver.Task == Task)
+		{
+			UE_VLOG(OwnerActor, LogNHTN, Log, TEXT("[%s] unregistering message observer (%s)"),
+				MessageObserver.Task.IsValid() ? *MessageObserver.Task->GetTitleDescription() : TEXT("None"),
+				*MessageObserver.Message.ToString());
+			MessageObservers.RemoveAt(i);
+		}
+	}
 }
 
 void UNHTNComponent::StopPlanning()

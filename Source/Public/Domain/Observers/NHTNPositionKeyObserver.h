@@ -36,7 +36,7 @@ public:
 
 protected:
 	/** Checks whether it should notify the HTN component and updates the last key position */
-	virtual EBlackboardNotificationResult OnKeyObservedChange(const UBlackboardComponent& BlackboardComponent, uint8 KeyID) override;
+	virtual EBlackboardNotificationResult OnKeyObservedChange(const UBlackboardComponent& BlackboardComponent, FBlackboard::FKey KeyID) override;
 
 	/** Updates the LastPosition with the current key position */
 	void UpdateLastKeyPosition();
