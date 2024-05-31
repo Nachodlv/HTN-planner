@@ -61,7 +61,7 @@ TStatId UNHTNPositionKeyObserver::GetStatId() const
 }
 
 EBlackboardNotificationResult UNHTNPositionKeyObserver::OnKeyObservedChange(
-	const UBlackboardComponent& BlackboardComponent, uint8 KeyID)
+	const UBlackboardComponent& BlackboardComponent, FBlackboard::FKey KeyID)
 {
 	FVector Location;
 	if (HTNComp->GetBlackboardComponent()->GetLocationFromEntry(BlackboardKey.SelectedKeyName, Location))

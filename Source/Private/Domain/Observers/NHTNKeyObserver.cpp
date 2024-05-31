@@ -16,7 +16,7 @@ void UNHTNKeyObserver::Initialize(UNHTNComponent* InHTNComp)
 }
 
 EBlackboardNotificationResult UNHTNKeyObserver::OnKeyObservedChange(const UBlackboardComponent& BlackboardComponent,
-	uint8 KeyID)
+	FBlackboard::FKey KeyID)
 {
 	ResetCurrentPlan();
 	return EBlackboardNotificationResult::ContinueObserving;
@@ -124,7 +124,10 @@ void UNHTNKeyObserver::PostEditChangeChainProperty(FPropertyChangedChainEvent& P
 
 void UNHTNKeyObserver::BeginDestroy()
 {
-	HTNComp->OnCurrenTaskStateChanged.RemoveDynamic(this, &UNHTNKeyObserver::OnCurrentTaskStateChanged);
+	if (HTNComp)
+	{
+		HTNComp->OnCurrenTaskStateChanged.RemoveDynamic(this, &UNHTNKeyObserver::OnCurrentTaskStateChanged);
+	}
 	if (bRelevant)
 	{
 		OnCeaseRelevance();
